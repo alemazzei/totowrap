@@ -23,3 +23,7 @@ body{background:radial-gradient(circle at 90% -10%,rgba(85,168,255,.17),transpar
 .danger{background:transparent;color:var(--red);border-color:rgba(255,69,95,.4)!important}
 .finalize{width:100%;margin-top:10px;background:var(--blue);color:#06111f;border-color:var(--blue)!important}
 @media(max-width:560px){.player-tools{grid-template-columns:1fr 1fr}.player-tools label{grid-column:1/-1}.rules{flex-direction:column}}
+.admin-session{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-6px 0 18px;padding:10px 12px;border:1px solid rgba(85,168,255,.3);border-radius:12px;background:rgba(85,168,255,.08);color:var(--blue);font-size:.82rem;font-weight:800}
+.admin-session button{border:0;background:transparent;color:var(--ink);text-decoration:underline;cursor:pointer}
+.login-submit{width:100%;padding:13px 16px;border:0;border-radius:12px;font-weight:900;cursor:pointer;margin-top:8px}
+.icon-btn.admin-on{border-color:var(--blue);color:var(--blue);box-shadow:0 0 20px rgba(85,168,255,.15)}

@@ -1,3 +1,21 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA2_gerZLEBYXbNipBQjbD1joqoO-gUm_0",
+  authDomain: "totowrap-ecfea.firebaseapp.com",
+  projectId: "totowrap-ecfea",
+  storageBucket: "totowrap-ecfea.firebasestorage.app",
+  messagingSenderId: "415033951245",
+  appId: "1:415033951245:web:945a6d8dbb91051ba2c144"
+};
+const firebaseApp=initializeApp(firebaseConfig);
+const db=getFirestore(firebaseApp);
+const auth=getAuth(firebaseApp);
+const STATE_REF=doc(db,"totowrap","state");
+const ADMIN_UID="4hgyioeFlcYixjF2DpRAxzVVowL2";
+
 const original = {
   day: 1,
   wrapTime: "",
@@ -6,8 +24,8 @@ const original = {
 };
 
 const clone = v => JSON.parse(JSON.stringify(v));
-const STORAGE_KEY="totowrap-state-v2";
-let state = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || clone(original); } catch { return clone(original); } })();
+let state = clone(original);
+let isAdmin=false;
 let route = (location.hash || "#today").slice(1);
 let accuracyOrder = "best";
 
@@ -39,7 +57,7 @@ const pointsFor = t => { if(!t||!state.wrapTime)return 0; if(t.slice(0,5)===stat
 const bandLabel = t => {const band=bandFor(t);return band?`${clock(band.lower)}–${clock(band.upper)}`:"—"};
 const status = t => { const pts=pointsFor(t); if(!t)return ["Nessuna bet","none"]; if(pts===3)return ["ESATTO · 3 PT","win"]; if(pts===1)return ["FASCIA · 1 PT","close"]; return ["FUORI","out"]; };
 const fmtAvg = m => `${Math.floor(m)}m${Math.round((m%1)*60).toString().padStart(2,"0")}s`;
-const persist = () => localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+const persist = async () => {if(!isAdmin)throw new Error("Accesso amministratore richiesto");await setDoc(STATE_REF,clone(state))};
 
 function liveClock(){
   const el=qs("#liveClock"),date=qs("#liveDate"); if(!el)return;
@@ -91,16 +109,23 @@ document.addEventListener("click",e=>{
 });
 window.addEventListener("hashchange",()=>{route=(location.hash||"#today").slice(1);render()});
 
-const dialog=qs("#adminDialog"),form=qs("#adminForm"),playerInput=qs("#playerInput");
+const dialog=qs("#adminDialog"),form=qs("#adminForm"),playerInput=qs("#playerInput"),loginDialog=qs("#loginDialog"),loginForm=qs("#loginForm");
 function refreshPlayers(selected=0){playerInput.innerHTML=state.players.length?state.players.map((p,i)=>`<option value="${i}">${esc(p[0])}</option>`).join(""):`<option value="">Nessun partecipante</option>`;playerInput.value=state.players.length?String(Math.min(selected,state.players.length-1)):"";qs("#betTimeInput").disabled=!state.players.length;qs("#betTimeInput").value=state.players.length?(state.players[+playerInput.value][3]||"20:00"):""}
-qs("#openAdmin").addEventListener("click",()=>{qs("#wrapTimeInput").value=state.wrapTime;refreshPlayers();dialog.showModal()});
+async function mutateAndSave(mutator,success){const before=clone(state);mutator();try{await persist();render();toast(success);return true}catch(error){state=before;render();console.error(error);toast("Salvataggio non riuscito: riprova");return false}}
+qs("#openAdmin").addEventListener("click",()=>{if(!isAdmin){loginDialog.showModal();return}qs("#wrapTimeInput").value=state.wrapTime;refreshPlayers();dialog.showModal()});
 playerInput.addEventListener("change",()=>{if(playerInput.value!=="")qs("#betTimeInput").value=state.players[+playerInput.value][3]||"20:00"});
-form.addEventListener("submit",e=>{if(e.submitter?.value==="cancel")return;e.preventDefault();state.wrapTime=qs("#wrapTimeInput").value;if(playerInput.value!=="")state.players[+playerInput.value][3]=qs("#betTimeInput").value;persist();dialog.close();render();toast("Giornata aggiornata")});
-qs("#addPlayer").addEventListener("click",()=>{const input=qs("#newPlayerInput"),name=input.value.trim();if(!name)return toast("Inserisci un nome");if(state.players.some(p=>p[0].toLowerCase()===name.toLowerCase()))return toast("Partecipante già presente");state.players.push([name,0,0,null,0,0]);input.value="";persist();refreshPlayers(state.players.length-1);render();toast(`${name} aggiunto`)});
-qs("#removePlayer").addEventListener("click",()=>{if(playerInput.value==="")return;const idx=+playerInput.value,name=state.players[idx][0];if(!confirm(`Rimuovere ${name}?`))return;state.players.splice(idx,1);persist();refreshPlayers(Math.max(0,idx-1));render();toast(`${name} rimosso`)});
-qs("#finalizeDay").addEventListener("click",()=>{if(!state.players.some(p=>p[3]))return toast("Inserisci almeno una bet");const wrap=qs("#wrapTimeInput").value;if(!wrap)return toast("Inserisci l'orario di wrap");state.wrapTime=wrap;const scorers=[];state.players.forEach(p=>{if(!p[3])return;const pts=pointsFor(p[3]);const distance=diff(p[3]);p[1]+=pts;if(pts>0){p[2]+=1;scorers.push([p[0],p[3],pts])}p[4]=((p[4]*p[5])+distance)/(p[5]+1);p[5]+=1});const best=Math.max(0,...scorers.map(s=>s[2]));const winners=scorers.filter(s=>s[2]===best);state.history.unshift([state.day,winners.length?winners.map(w=>w[0]).join(" · "):"Nessun vincitore",winners.length?winners.map(w=>w[1]).join(" · "):"—",wrap,best]);state.day+=1;state.players.forEach(p=>p[3]=null);persist();dialog.close();route="standings";location.hash=route;render();toast("Punti assegnati e giornata chiusa")});
-qs("#resetDemo").addEventListener("click",()=>{if(!confirm("Azzerare partecipanti, classifica, precisione e storico?"))return;state=clone(original);persist();dialog.close();render();toast("TotoWrap azzerato: si riparte dal giorno 1")});
+form.addEventListener("submit",async e=>{if(e.submitter?.value==="cancel")return;e.preventDefault();const wrap=qs("#wrapTimeInput").value,playerIndex=playerInput.value,bet=qs("#betTimeInput").value;if(await mutateAndSave(()=>{state.wrapTime=wrap;if(playerIndex!=="")state.players[+playerIndex][3]=bet},"Giornata aggiornata"))dialog.close()});
+qs("#addPlayer").addEventListener("click",async()=>{const input=qs("#newPlayerInput"),name=input.value.trim();if(!name)return toast("Inserisci un nome");if(state.players.some(p=>p[0].toLowerCase()===name.toLowerCase()))return toast("Partecipante già presente");if(await mutateAndSave(()=>state.players.push([name,0,0,null,0,0]),`${name} aggiunto`)){input.value="";refreshPlayers(state.players.length-1)}});
+qs("#removePlayer").addEventListener("click",async()=>{if(playerInput.value==="")return;const idx=+playerInput.value,name=state.players[idx][0];if(!confirm(`Rimuovere ${name}?`))return;if(await mutateAndSave(()=>state.players.splice(idx,1),`${name} rimosso`))refreshPlayers(Math.max(0,idx-1))});
+qs("#finalizeDay").addEventListener("click",async()=>{if(!state.players.some(p=>p[3]))return toast("Inserisci almeno una bet");const wrap=qs("#wrapTimeInput").value;if(!wrap)return toast("Inserisci l'orario di wrap");const saved=await mutateAndSave(()=>{state.wrapTime=wrap;const scorers=[];state.players.forEach(p=>{if(!p[3])return;const pts=pointsFor(p[3]),distance=diff(p[3]);p[1]+=pts;if(pts>0){p[2]+=1;scorers.push([p[0],p[3],pts])}p[4]=((p[4]*p[5])+distance)/(p[5]+1);p[5]+=1});const best=Math.max(0,...scorers.map(s=>s[2])),winners=scorers.filter(s=>s[2]===best);state.history.unshift([state.day,winners.length?winners.map(w=>w[0]).join(" · "):"Nessun vincitore",winners.length?winners.map(w=>w[1]).join(" · "):"—",wrap,best]);state.day+=1;state.wrapTime="";state.players.forEach(p=>p[3]=null)},"Punti assegnati e giornata chiusa");if(saved){dialog.close();route="standings";location.hash=route;render()}});
+qs("#resetDemo").addEventListener("click",async()=>{if(!confirm("Azzerare partecipanti, classifica, precisione e storico?"))return;if(await mutateAndSave(()=>state=clone(original),"TotoWrap azzerato: si riparte dal giorno 1"))dialog.close()});
+loginForm.addEventListener("submit",async e=>{e.preventDefault();const button=loginForm.querySelector("button[type=submit]");button.disabled=true;button.textContent="Accesso…";try{const credential=await signInWithEmailAndPassword(auth,qs("#loginEmail").value.trim(),qs("#loginPassword").value);if(credential.user.uid!==ADMIN_UID){await signOut(auth);throw new Error("Utente non autorizzato")}qs("#loginPassword").value="";loginDialog.close();qs("#wrapTimeInput").value=state.wrapTime;refreshPlayers();dialog.showModal();toast("Accesso amministratore effettuato")}catch(error){console.error(error);toast("Email o password non corretti")}finally{button.disabled=false;button.textContent="Accedi"}});
+qs("#closeLogin").addEventListener("click",()=>loginDialog.close());
+qs("#signOutBtn").addEventListener("click",async()=>{dialog.close();await signOut(auth);toast("Accesso amministratore terminato")});
 function toast(text){const t=qs("#toast");t.textContent=text;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
+
+onAuthStateChanged(auth,user=>{isAdmin=user?.uid===ADMIN_UID;qs("#openAdmin").classList.toggle("admin-on",isAdmin);qs("#openAdmin").title=isAdmin?"Gestione amministratore":"Accesso amministratore";if(user&&!isAdmin)signOut(auth)});
+onSnapshot(STATE_REF,snapshot=>{if(snapshot.exists()){const remote=snapshot.data();state={...clone(original),...remote,players:Array.isArray(remote.players)?remote.players:[],history:Array.isArray(remote.history)?remote.history:[]};render()}},error=>{console.error(error);toast("Database temporaneamente non disponibile")});
 
 if(document.modelContext?.registerTool){
   document.modelContext.registerTool({name:"open_totowrap_section",title:"Apri sezione TotoWrap",description:"Apre una sezione del sito tra today, standings, accuracy e history.",inputSchema:{type:"object",properties:{section:{type:"string",enum:["today","standings","accuracy","history"]}},required:["section"],additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:false},execute:({section})=>{route=section;location.hash=section;render();return{section}}});

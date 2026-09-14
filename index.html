@@ -36,6 +36,7 @@
         <div><span class="eyebrow">GESTIONE RAPIDA</span><h2>Aggiorna la giornata</h2></div>
         <button class="icon-btn" value="cancel" aria-label="Chiudi">×</button>
       </div>
+      <div class="admin-session"><span>Accesso amministratore attivo</span><button type="button" id="signOutBtn">Esci</button></div>
       <label>Orario effettivo di wrap
         <input id="wrapTimeInput" type="time" step="1" required>
       </label>
@@ -57,11 +58,28 @@
         <button type="submit" class="primary" value="default">Salva aggiornamento</button>
       </div>
       <button type="button" class="finalize" id="finalizeDay">Chiudi giornata e assegna i punti</button>
-      <p class="helper">In questa versione GitHub Pages gli aggiornamenti restano salvati sul dispositivo.</p>
+      <p class="helper">Ogni aggiornamento viene salvato nel database condiviso e appare in tempo reale su tutti i dispositivi.</p>
+    </form>
+  </dialog>
+
+  <dialog id="loginDialog">
+    <form class="dialog-card" id="loginForm">
+      <div class="dialog-head">
+        <div><span class="eyebrow">AREA RISERVATA</span><h2>Accesso amministratore</h2></div>
+        <button type="button" class="icon-btn" id="closeLogin" aria-label="Chiudi">×</button>
+      </div>
+      <label>Email
+        <input id="loginEmail" type="email" autocomplete="username" required>
+      </label>
+      <label>Password
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="primary login-submit">Accedi</button>
+      <p class="helper">Le credenziali vengono gestite direttamente da Firebase e non sono salvate nel sito.</p>
     </form>
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
