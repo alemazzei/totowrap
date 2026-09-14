@@ -1,28 +1,13 @@
 const original = {
-  day: 50,
-  totalDays: 50,
-  wrapTime: "21:18",
-  players: [
-    ["Colette",10,4,"21:20",2.6,48],["Edoardo",8,3,"21:00",33.68,49],["Sarah",7,7,"20:23",40.23,34],
-    ["Alessandro",7,4,"20:18",26.63,24],["Daniela",7,4,"20:47",37.1,41],["Elisa",6,2,"20:35",34.53,46],
-    ["Enrico",4,3,"21:02",34.77,47],["Alex",3,3,"21:00",34.58,42],["Andrea",3,3,"21:03",30.92,50],
-    ["Beatrice K.",3,3,"21:23",34.1,36],["Marco",3,3,"20:48",32.87,45],["Riccardo",3,3,"21:30",30.1,48],
-    ["Erli",2,3,"21:13",29.73,39],["Beatrice M.",2,2,"21:33",29.78,43],["Luigi",1,1,"20:48",33.63,51],
-    ["Maria",1,1,"20:50",39.38,36],["Giulia",0,1,"21:00",40.32,50],["Luca E.",0,1,"20:32",34.8,47],
-    ["Francesco",-1,2,"19:59",31.3,32],["Francesca",-1,1,null,36.72,47],["Luca B.",-1,0,"21:02",46.1,47],
-    ["Valentina",-2,1,"20:23",41.07,30],["Michelangelo",-2,0,null,36.3,32],["Millie",-2,0,null,55,8],
-    ["Tommaso",-3,1,null,40,21],["Carlo",-3,0,"21:15",36.37,30]
-  ],
-  history: [
-    [50,"Colette","21:20","21:18:38",2],[49,"Edoardo","20:10","20:02:17",2],[48,"Erli","20:00","20:03:31",1],
-    [47,"Sarah","18:08","18:08:51",3],[46,"Sarah","20:02","20:01:10",1],[45,"Alessandro","22:37","22:37:48",3],
-    [44,"Sarah","19:34","20:07:02",1],[43,"Marco · Riccardo","18:24","18:30:27",1],[42,"Enrico · Sarah","18:38","18:35:21",1],
-    [41,"Nessun vincitore","—","18:14:40",0],[40,"Alessandro","23:08","23:10:34",1],[39,"Alessandro · Marco · Riccardo","22:15","22:16:30",2]
-  ]
+  day: 1,
+  wrapTime: "",
+  players: [],
+  history: []
 };
 
 const clone = v => JSON.parse(JSON.stringify(v));
-let state = (() => { try { return JSON.parse(localStorage.getItem("wrapbet-state")) || clone(original); } catch { return clone(original); } })();
+const STORAGE_KEY="totowrap-state-v2";
+let state = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || clone(original); } catch { return clone(original); } })();
 let route = (location.hash || "#today").slice(1);
 let accuracyOrder = "best";
 
@@ -54,7 +39,7 @@ const pointsFor = t => { if(!t||!state.wrapTime)return 0; if(t.slice(0,5)===stat
 const bandLabel = t => {const band=bandFor(t);return band?`${clock(band.lower)}–${clock(band.upper)}`:"—"};
 const status = t => { const pts=pointsFor(t); if(!t)return ["Nessuna bet","none"]; if(pts===3)return ["ESATTO · 3 PT","win"]; if(pts===1)return ["FASCIA · 1 PT","close"]; return ["FUORI","out"]; };
 const fmtAvg = m => `${Math.floor(m)}m${Math.round((m%1)*60).toString().padStart(2,"0")}s`;
-const persist = () => localStorage.setItem("wrapbet-state",JSON.stringify(state));
+const persist = () => localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
 
 function liveClock(){
   const el=qs("#liveClock"),date=qs("#liveDate"); if(!el)return;
@@ -66,7 +51,7 @@ function todayView(){
   const withBets=state.players.filter(p=>p[3]);
   return `<section class="view"><div class="hero-grid">
     <article class="card clock-card"><span class="eyebrow">ORA UFFICIALE LIVE</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span></article>
-    <article class="card target-card"><div><span class="eyebrow">FINE EFFETTIVA</span><h2>Wrap del giorno</h2><p>${withBets.length} bet inserite</p><div class="rules"><div class="rule"><strong>3 punti</strong><span>minuto esatto</span></div><div class="rule"><strong>1 punto</strong><span>fascia automatica</span></div></div></div><div class="target-ring"><strong>${esc(state.wrapTime)}</strong></div></article>
+    <article class="card target-card"><div><span class="eyebrow">FINE EFFETTIVA</span><h2>Wrap del giorno</h2><p>${withBets.length} bet inserite</p><div class="rules"><div class="rule"><strong>3 punti</strong><span>minuto esatto</span></div><div class="rule"><strong>1 punto</strong><span>fascia automatica</span></div></div></div><div class="target-ring"><strong>${esc(state.wrapTime||"--:--:--")}</strong></div></article>
   </div><div class="section-head"><div><span class="eyebrow">GIORNATA ${state.day}</span><h1>Le bet di oggi</h1></div><p>Ordinate dalla più vicina al wrap</p></div>
   <div class="bets">${state.players.length?[...state.players].sort((a,b)=>(diff(a[3])??9999)-(diff(b[3])??9999)).map(p=>{const s=status(p[3]);return `<article class="card bet-card"><div class="avatar">${initials(p[0])}</div><div><h3>${esc(p[0])}</h3><div class="bet-meta">${p[3]?`Fascia ${bandLabel(p[3])}`:"Non ha giocato"}</div></div><div><div class="bet-time">${p[3]||"—"}</div><span class="pill ${s[1]}">${s[0]}</span></div></article>`}).join(""):`<div class="card empty">Aggiungi i partecipanti dal pulsante Gestione.</div>`}</div></section>`;
 }
@@ -114,7 +99,7 @@ form.addEventListener("submit",e=>{if(e.submitter?.value==="cancel")return;e.pre
 qs("#addPlayer").addEventListener("click",()=>{const input=qs("#newPlayerInput"),name=input.value.trim();if(!name)return toast("Inserisci un nome");if(state.players.some(p=>p[0].toLowerCase()===name.toLowerCase()))return toast("Partecipante già presente");state.players.push([name,0,0,null,0,0]);input.value="";persist();refreshPlayers(state.players.length-1);render();toast(`${name} aggiunto`)});
 qs("#removePlayer").addEventListener("click",()=>{if(playerInput.value==="")return;const idx=+playerInput.value,name=state.players[idx][0];if(!confirm(`Rimuovere ${name}?`))return;state.players.splice(idx,1);persist();refreshPlayers(Math.max(0,idx-1));render();toast(`${name} rimosso`)});
 qs("#finalizeDay").addEventListener("click",()=>{if(!state.players.some(p=>p[3]))return toast("Inserisci almeno una bet");const wrap=qs("#wrapTimeInput").value;if(!wrap)return toast("Inserisci l'orario di wrap");state.wrapTime=wrap;const scorers=[];state.players.forEach(p=>{if(!p[3])return;const pts=pointsFor(p[3]);const distance=diff(p[3]);p[1]+=pts;if(pts>0){p[2]+=1;scorers.push([p[0],p[3],pts])}p[4]=((p[4]*p[5])+distance)/(p[5]+1);p[5]+=1});const best=Math.max(0,...scorers.map(s=>s[2]));const winners=scorers.filter(s=>s[2]===best);state.history.unshift([state.day,winners.length?winners.map(w=>w[0]).join(" · "):"Nessun vincitore",winners.length?winners.map(w=>w[1]).join(" · "):"—",wrap,best]);state.day+=1;state.players.forEach(p=>p[3]=null);persist();dialog.close();route="standings";location.hash=route;render();toast("Punti assegnati e giornata chiusa")});
-qs("#resetDemo").addEventListener("click",()=>{state=clone(original);persist();dialog.close();render();toast("Dati demo ripristinati")});
+qs("#resetDemo").addEventListener("click",()=>{if(!confirm("Azzerare partecipanti, classifica, precisione e storico?"))return;state=clone(original);persist();dialog.close();render();toast("TotoWrap azzerato: si riparte dal giorno 1")});
 function toast(text){const t=qs("#toast");t.textContent=text;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
 
 if(document.modelContext?.registerTool){
