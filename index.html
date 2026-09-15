@@ -45,7 +45,7 @@
           <input id="wrapTimeInput" type="time" step="1">
         </label>
       </div>
-      <p class="field-note">La stima aiuta a scegliere la bet. Il wrap effettivo serve per assegnare i punti.</p>
+      <p class="field-note">Inserisci la stima a inizio giornata. Alla fine usa “WRAP ORA” per registrare automaticamente anche i secondi.</p>
       <div class="bulk-bets-head"><span>Bet dei partecipanti</span><small>Inseriscile tutte e salva una volta</small></div>
       <div class="bulk-bets" id="bulkBets"></div>
       <div class="player-tools">
@@ -62,7 +62,8 @@
         <button type="button" class="ghost" id="resetDemo">Azzera tutto</button>
         <button type="submit" class="primary" value="default">Salva aggiornamento</button>
       </div>
-      <button type="button" class="finalize" id="finalizeDay">Chiudi giornata e assegna i punti</button>
+      <button type="button" class="wrap-now" id="wrapNow">WRAP ORA · chiudi e assegna i punti</button>
+      <button type="button" class="finalize" id="finalizeDay">Chiudi usando il wrap inserito manualmente</button>
       <button type="button" class="advance-day" id="advanceDay">Passa al giorno successivo senza punti</button>
       <p class="helper">Ogni aggiornamento viene salvato nel database condiviso e appare in tempo reale su tutti i dispositivi.</p>
     </form>

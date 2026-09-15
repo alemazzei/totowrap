@@ -160,8 +160,8 @@ qs("#openAdmin").addEventListener("click",()=>{if(!isAdmin){loginDialog.showModa
 form.addEventListener("submit",async e=>{if(e.submitter?.value==="cancel")return;e.preventDefault();const estimated=qs("#estimatedTimeInput").value,wrap=qs("#wrapTimeInput").value,bets=[...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}));if(await mutateAndSave(()=>{state.estimatedTime=estimated;state.wrapTime=wrap;bets.forEach(item=>{if(state.players[item.index])state.players[item.index][3]=item.time})},"Stima e bet aggiornate"))dialog.close()});
 qs("#addPlayer").addEventListener("click",async()=>{const input=qs("#newPlayerInput"),name=input.value.trim();if(!name)return toast("Inserisci un nome");if(state.players.some(p=>p[0].toLowerCase()===name.toLowerCase()))return toast("Partecipante già presente");if(await mutateAndSave(()=>state.players.push([name,0,0,null,0,0]),`${name} aggiunto`)){input.value="";refreshPlayers(state.players.length-1)}});
 qs("#removePlayer").addEventListener("click",async()=>{if(playerInput.value==="")return;const idx=+playerInput.value,name=state.players[idx][0];if(!confirm(`Rimuovere ${name}?`))return;if(await mutateAndSave(()=>state.players.splice(idx,1),`${name} rimosso`))refreshPlayers(Math.max(0,idx-1))});
-qs("#finalizeDay").addEventListener("click",async()=>{
-  const estimated=qs("#estimatedTimeInput").value,wrap=qs("#wrapTimeInput").value;
+async function closeDayAt(wrap,successMessage){
+  const estimated=qs("#estimatedTimeInput").value;
   const bets=[...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}));
   if(!bets.some(item=>item.time))return toast("Inserisci almeno una bet");
   if(!wrap)return toast("Inserisci il wrap effettivo");
@@ -185,9 +185,16 @@ qs("#finalizeDay").addEventListener("click",async()=>{
     state.estimatedTime="";
     state.wrapTime="";
     state.players.forEach(p=>p[3]=null);
-  },"Punti assegnati e giornata chiusa");
+  },successMessage);
   if(saved){dialog.close();route="standings";location.hash=route;render()}
+}
+qs("#wrapNow").addEventListener("click",async()=>{
+  const now=new Date();
+  const exact=[now.getHours(),now.getMinutes(),now.getSeconds()].map(value=>String(value).padStart(2,"0")).join(":");
+  qs("#wrapTimeInput").value=exact;
+  await closeDayAt(exact,`Wrap ${exact}: punti assegnati`);
 });
+qs("#finalizeDay").addEventListener("click",()=>closeDayAt(qs("#wrapTimeInput").value,"Punti assegnati e giornata chiusa"));
 qs("#advanceDay").addEventListener("click",async()=>{const nextDay=state.day+1;if(!confirm(`Passare al giorno ${nextDay} senza assegnare punti? Le bet e gli orari della giornata ${state.day} verranno cancellati.`))return;const saved=await mutateAndSave(()=>{state.day=nextDay;state.estimatedTime="";state.wrapTime="";state.players.forEach(p=>p[3]=null)},`Giorno ${nextDay} avviato`);if(saved){dialog.close();route="today";location.hash=route;render()}});
 qs("#resetDemo").addEventListener("click",async()=>{if(!confirm("Azzerare partecipanti, classifica, precisione e storico?"))return;if(await mutateAndSave(()=>state=clone(original),"TotoWrap azzerato: si riparte dal giorno 1"))dialog.close()});
 loginForm.addEventListener("submit",async e=>{e.preventDefault();const button=loginForm.querySelector("button[type=submit]");button.disabled=true;button.textContent="Accesso…";try{const credential=await signInWithEmailAndPassword(auth,qs("#loginEmail").value.trim(),qs("#loginPassword").value);if(credential.user.uid!==ADMIN_UID){await signOut(auth);throw new Error("Utente non autorizzato")}qs("#loginPassword").value="";loginDialog.close();qs("#estimatedTimeInput").value=state.estimatedTime;qs("#wrapTimeInput").value=state.wrapTime;refreshPlayers();dialog.showModal();toast("Accesso amministratore effettuato")}catch(error){console.error(error);toast("Email o password non corretti")}finally{button.disabled=false;button.textContent="Accedi"}});
