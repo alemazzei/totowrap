@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -57,7 +57,12 @@ const pointsFor = t => { if(!t||!state.wrapTime)return 0; if(t.slice(0,5)===stat
 const bandLabel = t => {const band=bandFor(t);return band?`${clock(band.lower)}–${clock(band.upper)}`:"—"};
 const status = t => { const pts=pointsFor(t); if(!t)return ["Nessuna bet","none"]; if(pts===3)return ["ESATTO · 3 PT","win"]; if(pts===1)return ["FASCIA · 1 PT","close"]; return ["FUORI","out"]; };
 const fmtAvg = m => `${Math.floor(m)}m${Math.round((m%1)*60).toString().padStart(2,"0")}s`;
-const persist = async () => {if(!isAdmin)throw new Error("Accesso amministratore richiesto");await setDoc(STATE_REF,clone(state))};
+const persist = async () => {
+  if(!isAdmin)throw new Error("Accesso amministratore richiesto");
+  // Firestore non consente array annidati. Salviamo quindi lo stato come JSON:
+  // il formato interno dell'app resta invariato e partecipanti/storico funzionano.
+  await setDoc(STATE_REF,{payload:JSON.stringify(clone(state)),updatedAt:serverTimestamp()});
+};
 
 function liveClock(){
   const el=qs("#liveClock"),date=qs("#liveDate"); if(!el)return;
@@ -125,7 +130,17 @@ qs("#signOutBtn").addEventListener("click",async()=>{dialog.close();await signOu
 function toast(text){const t=qs("#toast");t.textContent=text;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
 
 onAuthStateChanged(auth,user=>{isAdmin=user?.uid===ADMIN_UID;qs("#openAdmin").classList.toggle("admin-on",isAdmin);qs("#openAdmin").title=isAdmin?"Gestione amministratore":"Accesso amministratore";if(user&&!isAdmin)signOut(auth)});
-onSnapshot(STATE_REF,snapshot=>{if(snapshot.exists()){const remote=snapshot.data();state={...clone(original),...remote,players:Array.isArray(remote.players)?remote.players:[],history:Array.isArray(remote.history)?remote.history:[]};render()}},error=>{console.error(error);toast("Database temporaneamente non disponibile")});
+onSnapshot(STATE_REF,snapshot=>{
+  if(!snapshot.exists())return;
+  const stored=snapshot.data();
+  let remote=stored;
+  if(typeof stored.payload==="string"){
+    try{remote=JSON.parse(stored.payload)}
+    catch(error){console.error(error);toast("Dati del database non validi");return}
+  }
+  state={...clone(original),...remote,players:Array.isArray(remote.players)?remote.players:[],history:Array.isArray(remote.history)?remote.history:[]};
+  render();
+},error=>{console.error(error);toast("Database temporaneamente non disponibile")});
 
 if(document.modelContext?.registerTool){
   document.modelContext.registerTool({name:"open_totowrap_section",title:"Apri sezione TotoWrap",description:"Apre una sezione del sito tra today, standings, accuracy e history.",inputSchema:{type:"object",properties:{section:{type:"string",enum:["today","standings","accuracy","history"]}},required:["section"],additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:false},execute:({section})=>{route=section;location.hash=section;render();return{section}}});
