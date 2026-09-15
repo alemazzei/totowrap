@@ -13,7 +13,7 @@
   <div class="shell">
     <header class="topbar">
       <button class="brand" data-route="today" aria-label="Vai a Oggi">
-        <span class="brand-mark" aria-hidden="true">W</span>
+        <span class="brand-mark" aria-hidden="true"><img src="gu3-logo.png" alt=""></span>
         <span>TOTO<span>WRAP</span></span>
       </button>
       <div class="day-chip"><span>Giornata</span><strong id="dayNumber">1</strong></div>
@@ -37,20 +37,25 @@
         <button class="icon-btn" value="cancel" aria-label="Chiudi">×</button>
       </div>
       <div class="admin-session"><span>Accesso amministratore attivo</span><button type="button" id="signOutBtn">Esci</button></div>
-      <label>Orario effettivo di wrap
-        <input id="wrapTimeInput" type="time" step="1" required>
-      </label>
-      <label>Partecipante
-        <select id="playerInput"></select>
-      </label>
-      <label>Nuova bet
-        <input id="betTimeInput" type="time" required>
-      </label>
+      <div class="time-inputs">
+        <label>Fine stimata
+          <input id="estimatedTimeInput" type="time" step="1">
+        </label>
+        <label>Wrap effettivo
+          <input id="wrapTimeInput" type="time" step="1">
+        </label>
+      </div>
+      <p class="field-note">La stima aiuta a scegliere la bet. Il wrap effettivo serve per assegnare i punti.</p>
+      <div class="bulk-bets-head"><span>Bet dei partecipanti</span><small>Inseriscile tutte e salva una volta</small></div>
+      <div class="bulk-bets" id="bulkBets"></div>
       <div class="player-tools">
         <label>Nuovo partecipante
           <input id="newPlayerInput" type="text" maxlength="30" placeholder="Nome">
         </label>
         <button type="button" class="secondary" id="addPlayer">Aggiungi</button>
+      </div>
+      <div class="remove-player">
+        <select id="playerInput" aria-label="Partecipante da rimuovere"></select>
         <button type="button" class="danger" id="removePlayer">Rimuovi selezionato</button>
       </div>
       <div class="dialog-actions">
@@ -58,6 +63,7 @@
         <button type="submit" class="primary" value="default">Salva aggiornamento</button>
       </div>
       <button type="button" class="finalize" id="finalizeDay">Chiudi giornata e assegna i punti</button>
+      <button type="button" class="advance-day" id="advanceDay">Passa al giorno successivo senza punti</button>
       <p class="helper">Ogni aggiornamento viene salvato nel database condiviso e appare in tempo reale su tutti i dispositivi.</p>
     </form>
   </dialog>
