@@ -31,6 +31,7 @@ let isAdmin=false;
 let route = (location.hash || "#today").slice(1);
 let accuracyOrder = "best";
 let accuracyPlayer = null;
+let tablesTab = "standings";
 
 const app = document.querySelector("#app");
 const qs = s => document.querySelector(s);
@@ -99,12 +100,38 @@ function todayView(){
   <p class="bet-footnote">Dall'orario più presto al più tardi. <span>3 punti per il minuto esatto · 1 punto per la fascia.</span></p></section>`;
 }
 
+function betOffsetSeconds(bet,wrap){
+  if(!bet||!wrap)return null;
+  let delta=toSec(bet)-toSec(wrap);
+  if(delta>DAY_SEC/2)delta-=DAY_SEC;
+  if(delta<-DAY_SEC/2)delta+=DAY_SEC;
+  return delta;
+}
+function participantStats(player){
+  const days=[...state.history].sort((a,b)=>b[0]-a[0]);
+  const records=days.flatMap(day=>(Array.isArray(day[6])?day[6]:[]).filter(item=>item.name===player[0]).map(item=>({item,day})));
+  const exact=records.filter(r=>r.item.points===3).length;
+  const wrong=records.filter(r=>r.item.points===0).map(r=>betOffsetSeconds(r.item.bet,r.day[3])).filter(v=>v!==null).map(Math.abs);
+  const forgotten=days.filter(day=>Array.isArray(day[7])&&day[7].includes(player[0])&&!(day[6]||[]).some(item=>item.name===player[0]&&item.bet)).length;
+  const previous=days[0],last=previous&&(previous[6]||[]).find(item=>item.name===player[0]);
+  const offset=last?betOffsetSeconds(last.bet,previous[3]):null;
+  const lastLabel=offset===null?(previous?"Nessuna bet nella giornata precedente":"Nessuna giornata conclusa"):offset===0?"La bet precedente coincideva con il wrap":`La bet del giorno ${previous[0]} era ${Math.floor(Math.abs(offset)/60)} min, ${Math.abs(offset)%60} sec ${offset<0?"prima":"dopo"} il wrap effettivo`;
+  const incomplete=days.some(day=>!Array.isArray(day[7]));
+  return {exact,forgotten,closest:wrong.length?Math.min(...wrong):null,lastLabel,incomplete};
+}
+function participantDetails(player){
+  const s=participantStats(player);
+  return `<div class="participant-detail"><p class="last-bet">${esc(s.lastLabel)}</p><div class="participant-metrics"><div><strong>${player[2]}</strong><span>Vittorie totali</span></div><div><strong>${s.exact}</strong><span>Vittorie esatte</span></div><div><strong>${s.forgotten}</strong><span>Bet dimenticate</span></div><div><strong>${s.closest===null?"—":`${s.closest}s`}</strong><span>Closest wrong bet</span></div></div><p class="field-note">Closest wrong bet: la bet senza punti più vicina al wrap.${s.incomplete?" Le bet dimenticate sono conteggiate solo nelle giornate con elenco partecipanti registrato; le vecchie assenze non sono ricostruibili.":""}</p></div>`;
+}
+function tablesView(){
+  return `<div class="tables-view"><div class="tables-tabs" role="group" aria-label="Sezioni di Tabelle"><button data-tables-tab="standings" class="${tablesTab==="standings"?"active":""}" aria-pressed="${tablesTab==="standings"}">Classifica</button><button data-tables-tab="accuracy" class="${tablesTab==="accuracy"?"active":""}" aria-pressed="${tablesTab==="accuracy"}">Precisione</button></div>${tablesTab==="accuracy"?accuracyView():standingsView()}</div>`;
+}
 function standingsView(){
   const sorted=[...state.players].sort((a,b)=>b[1]-a[1]||b[2]-a[2]); const max=Math.max(...sorted.map(p=>p[1]),1);
   if(!sorted.length)return `<section class="view"><div class="section-head"><div><span class="eyebrow">PUNTEGGI TOTALI</span><h1>Classifica generale</h1></div></div><div class="card empty">La classifica apparirà dopo aver aggiunto i partecipanti.</div></section>`;
   return `<section class="view"><div class="section-head"><div><span class="eyebrow">PUNTEGGI TOTALI</span><h1>Classifica generale</h1></div><p>${state.players.length} partecipanti</p></div>
   <div class="podium">${sorted.slice(0,3).map((p,i)=>`<article class="card podium-card"><div><span class="place">${i+1}° POSTO</span><h2>${esc(p[0])}</h2><span class="bet-meta">${p[2]} vittorie</span></div><div class="score">${p[1]} <small>pt</small></div></article>`).join("")}</div>
-  <div class="card rank-list">${sorted.map((p,i)=>`<div class="rank-row"><div class="rank-no">${i+1}</div><div><h3>${esc(p[0])}</h3><div class="bet-meta">${p[2]} ${p[2]===1?"vittoria":"vittorie"}</div></div><div class="rank-bar"><i style="width:${Math.max(3,p[1]/max*100)}%"></i></div><div class="rank-score">${p[1]} pt</div></div>`).join("")}</div></section>`;
+  <p class="helper">Clicca su un partecipante per aprire le sue statistiche.</p><div class="card rank-list">${sorted.map((p,i)=>`<details class="rank-entry"><summary class="rank-row"><span class="rank-no">${i+1}</span><span class="rank-person"><strong>${esc(p[0])}</strong><span class="bet-meta">${p[2]} ${p[2]===1?"vittoria":"vittorie"}</span></span><span class="rank-bar"><i style="width:${Math.max(3,p[1]/max*100)}%"></i></span><span class="rank-score">${p[1]} pt <span class="rank-chevron" aria-hidden="true">⌄</span></span></summary>${participantDetails(p)}</details>`).join("")}</div></section>`;
 }
 
 function accuracyView(){
@@ -141,19 +168,27 @@ return `<article class="card trend-card"><div class="trend-head"><div><span clas
 }
 
 function historyView(){
- return `<section class="view"><div class="section-head"><div><span class="eyebrow">ARCHIVIO</span><h1>Storico giornate</h1></div><p>Apri una giornata per i dettagli</p></div><div class="history-list">${state.history.map(h=>`<article class="card history-row"><button class="history-summary" aria-expanded="false"><span class="history-day">Giorno ${h[0]}</span><span class="history-winner"><strong>${esc(h[1])} ${award(h[4])}</strong><small>Bet vincente ${h[2]}</small></span><span class="history-score">+${h[4]} pt</span><span>⌄</span></button><div class="history-detail"><div class="mini"><span>Vincitore</span><strong>${esc(h[1])} ${award(h[4])}</strong></div><div class="mini"><span>Bet</span><strong>${h[2]}</strong></div><div class="mini"><span>Fine stimata</span><strong>${h[5]||"—"}</strong></div><div class="mini"><span>Wrap ufficiale</span><strong>${h[3]}</strong></div></div></article>`).join("")}</div></section>`;
+ return `<section class="view"><div class="section-head"><div><span class="eyebrow">Archivio TotoWrap</span><h1>Storico giornate</h1></div><p>Apri una giornata per vedere tutte le bet</p></div><div class="history-list">${state.history.map(h=>{
+   const details=Array.isArray(h[6])?h[6]:[],winners=details.filter(item=>item.points>0);
+   const winnerMarkup=winners.length?winners.map(item=>`<span class="historical-winner">${esc(item.name)} ${award(item.points)}<small>Bet ${esc(item.bet)} · +${item.points} pt</small></span>`).join(""):h[4]>0?String(h[1]).split(" · ").map(name=>`<span class="historical-winner">${esc(name)} ${award(h[4])}<small>Bet ${esc(h[2])}</small></span>`).join(""):"Nessun vincitore";
+   const roster=Array.isArray(h[7])?h[7]:details.map(item=>item.name);
+   const rows=[...details,...roster.filter(name=>!details.some(item=>item.name===name)).map(name=>({name,bet:null,points:0}))].sort((a,b)=>(toSec(a.bet)??Infinity)-(toSec(b.bet)??Infinity)||a.name.localeCompare(b.name,"it"));
+   return `<article class="card history-row"><button class="history-summary" aria-expanded="false"><span class="history-day">TotoWrap<br>Giorno ${esc(h[0])}</span><span class="history-winner">${winnerMarkup}</span><span class="history-official"><small>Wrap effettivo</small><strong>${esc(h[3])}</strong></span><span>⌄</span></button><div class="history-detail"><div class="history-meta"><span>Fine stimata <strong>${esc(h[5]||"—")}</strong></span><span>Wrap effettivo <strong>${esc(h[3])}</strong></span></div><h3>Tutte le bet della giornata</h3><ol class="history-bets">${rows.length?rows.map(item=>`<li class="history-bet${item.points>0?" winner":""}"><time>${esc(item.bet||"—")}</time><span class="history-bet-person">${esc(item.name)} ${award(item.points)}</span><span class="history-band">${esc(item.band||"")}</span><span class="pill ${!item.bet?"none":item.points===3?"win":item.points===1?"close":"out"}">${!item.bet?"Bet dimenticata":item.points===3?"ESATTO · 3 PT":item.points===1?"FASCIA · 1 PT":"💀 FUORI"}</span></li>`).join(""):`<li class="empty">Le altre bet non sono disponibili per questa vecchia giornata.</li>`}</ol></div></article>`;
+ }).join("")||`<div class="card empty">Non ci sono ancora giornate concluse.</div>`}</div></section>`;
 }
 
 function render(){
-  const allowed=["today","standings","accuracy","history"]; if(!allowed.includes(route))route="today";
+  if(route==="standings"||route==="accuracy"){tablesTab=route;route="tables"}
+  const allowed=["today","tables","history"]; if(!allowed.includes(route))route="today";
   qs("#dayNumber").textContent=state.day;
   document.querySelectorAll("[data-route]").forEach(b=>b.classList.toggle("active",b.dataset.route===route));
-  app.innerHTML=({today:todayView,standings:standingsView,accuracy:accuracyView,history:historyView})[route]();
+  app.innerHTML=({today:todayView,tables:tablesView,history:historyView})[route]();
   if(route==="today")liveClock();
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
 document.addEventListener("click",e=>{
+  const tab=e.target.closest("[data-tables-tab]");if(tab){tablesTab=tab.dataset.tablesTab;route="tables";render()}
   const nav=e.target.closest("[data-route]"); if(nav){route=nav.dataset.route;location.hash=route;render()}
   const order=e.target.closest("[data-order]"); if(order){accuracyOrder=order.dataset.order;render()}
   const person=e.target.closest("[data-accuracy-name]");if(person){accuracyPlayer=person.dataset.accuracyName;render()}
@@ -194,14 +229,14 @@ async function closeDayAt(wrap,successMessage){
     state.players.forEach(p=>{
       if(!p[3])return;
       const pts=pointsFor(p[3]),distance=diff(p[3]);
-      dayDetails.push({name:p[0],bet:p[3],errorMin:distance,points:pts});
+      dayDetails.push({name:p[0],bet:p[3],errorMin:distance,points:pts,band:bandLabel(p[3])});
       p[1]+=pts;
       if(pts>0){p[2]+=1;scorers.push([p[0],p[3],pts])}
       p[4]=((p[4]*p[5])+distance)/(p[5]+1);
       p[5]+=1;
     });
     const best=Math.max(0,...scorers.map(s=>s[2])),winners=scorers.filter(s=>s[2]===best);
-    state.history.unshift([state.day,winners.length?winners.map(w=>w[0]).join(" · "):"Nessun vincitore",winners.length?winners.map(w=>w[1]).join(" · "):"—",wrap,best,estimated,dayDetails]);
+    state.history.unshift([state.day,winners.length?winners.map(w=>w[0]).join(" · "):"Nessun vincitore",winners.length?winners.map(w=>w[1]).join(" · "):"—",wrap,best,estimated,dayDetails,state.players.map(p=>p[0])]);
     state.dayClosed=true;
   },successMessage);
   if(saved){dialog.close();route="today";location.hash=route;render()}
