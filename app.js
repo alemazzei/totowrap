@@ -168,13 +168,7 @@ return `<article class="card trend-card"><div class="trend-head"><div><span clas
 }
 
 function historyView(){
- return `<section class="view"><div class="section-head"><div><span class="eyebrow">Archivio TotoWrap</span><h1>Storico giornate</h1></div><p>Apri una giornata per vedere tutte le bet</p></div><div class="history-list">${state.history.map(h=>{
-   const details=Array.isArray(h[6])?h[6]:[],winners=details.filter(item=>item.points>0);
-   const winnerMarkup=winners.length?winners.map(item=>`<span class="historical-winner">${esc(item.name)} ${award(item.points)}<small>Bet ${esc(item.bet)} · +${item.points} pt</small></span>`).join(""):h[4]>0?String(h[1]).split(" · ").map(name=>`<span class="historical-winner">${esc(name)} ${award(h[4])}<small>Bet ${esc(h[2])}</small></span>`).join(""):"Nessun vincitore";
-   const roster=Array.isArray(h[7])?h[7]:details.map(item=>item.name);
-   const rows=[...details,...roster.filter(name=>!details.some(item=>item.name===name)).map(name=>({name,bet:null,points:0}))].sort((a,b)=>(toSec(a.bet)??Infinity)-(toSec(b.bet)??Infinity)||a.name.localeCompare(b.name,"it"));
-   return `<article class="card history-row"><button class="history-summary" aria-expanded="false"><span class="history-day">TotoWrap<br>Giorno ${esc(h[0])}</span><span class="history-winner">${winnerMarkup}</span><span class="history-official"><small>Wrap effettivo</small><strong>${esc(h[3])}</strong></span><span>⌄</span></button><div class="history-detail"><div class="history-meta"><span>Fine stimata <strong>${esc(h[5]||"—")}</strong></span><span>Wrap effettivo <strong>${esc(h[3])}</strong></span></div><h3>Tutte le bet della giornata</h3><ol class="history-bets">${rows.length?rows.map(item=>`<li class="history-bet${item.points>0?" winner":""}"><time>${esc(item.bet||"—")}</time><span class="history-bet-person">${esc(item.name)} ${award(item.points)}</span><span class="history-band">${esc(item.band||"")}</span><span class="pill ${!item.bet?"none":item.points===3?"win":item.points===1?"close":"out"}">${!item.bet?"Bet dimenticata":item.points===3?"ESATTO · 3 PT":item.points===1?"FASCIA · 1 PT":"💀 FUORI"}</span></li>`).join(""):`<li class="empty">Le altre bet non sono disponibili per questa vecchia giornata.</li>`}</ol></div></article>`;
- }).join("")||`<div class="card empty">Non ci sono ancora giornate concluse.</div>`}</div></section>`;
+ return `<section class="view"><div class="section-head"><div><span class="eyebrow">ARCHIVIO</span><h1>Storico giornate</h1></div><p>Apri una giornata per i dettagli</p></div><div class="history-list">${state.history.map(h=>`<article class="card history-row"><button class="history-summary" aria-expanded="false"><span class="history-day">Giorno ${h[0]}</span><span class="history-winner"><strong>${esc(h[1])} ${award(h[4])}</strong><small>Bet vincente ${h[2]}</small></span><span class="history-score">+${h[4]} pt</span><span>⌄</span></button><div class="history-detail"><div class="mini"><span>Vincitore</span><strong>${esc(h[1])} ${award(h[4])}</strong></div><div class="mini"><span>Bet</span><strong>${h[2]}</strong></div><div class="mini"><span>Fine stimata</span><strong>${h[5]||"—"}</strong></div><div class="mini"><span>Wrap ufficiale</span><strong>${h[3]}</strong></div></div></article>`).join("")}</div></section>`;
 }
 
 function render(){
@@ -229,7 +223,7 @@ async function closeDayAt(wrap,successMessage){
     state.players.forEach(p=>{
       if(!p[3])return;
       const pts=pointsFor(p[3]),distance=diff(p[3]);
-      dayDetails.push({name:p[0],bet:p[3],errorMin:distance,points:pts,band:bandLabel(p[3])});
+      dayDetails.push({name:p[0],bet:p[3],errorMin:distance,points:pts});
       p[1]+=pts;
       if(pts>0){p[2]+=1;scorers.push([p[0],p[3],pts])}
       p[4]=((p[4]*p[5])+distance)/(p[5]+1);
