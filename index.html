@@ -14,12 +14,11 @@
   <link rel="manifest" href="manifest.webmanifest?v=21">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="TotoWrap">
-  <link rel="stylesheet" href="style.css?v=20260916-21">
+  <link rel="stylesheet" href="style.css?v=20260916-22">
 </head>
 <body>
-  <div id="loadingScreen" role="status"><div class="logo-flip loading-logo" role="img" aria-label="TotoWrap e GU3"><div class="logo-rotor" aria-hidden="true"><div class="logo-face logo-front"><img src="totowrap-logo.png" alt=""></div><div class="logo-face logo-back"><img src="gu3-logo.png" alt=""></div></div></div><ul class="loading-points" aria-label="Assegnazione punteggi"><li>Orario esatto <strong>3pt</strong></li><li>Fascia oraria <strong>1pt</strong></li></ul><p id="loadingMessage">Caricamento della giornata…</p><button type="button" class="secondary" id="retryLoading" hidden onclick="location.reload()">Riprova</button><p class="loading-quote" id="loadingQuote">Complimenti Colette per la vittoria del TotoWrap</p></div>
+<div id="loadingScreen" role="status"><div class="logo-flip loading-logo" role="img" aria-label="TotoWrap e GU3"><div class="logo-rotor" aria-hidden="true"><div class="logo-face logo-front"><img src="totowrap-logo.png" alt=""></div><div class="logo-face logo-back"><img src="gu3-logo.png" alt=""></div></div></div><ul class="loading-points" aria-label="Assegnazione punteggi"><li>Orario esatto <strong>3pt</strong></li><li>Fascia oraria <strong>1pt</strong></li></ul><p class="loading-quote" id="loadingQuote">Complimenti Colette per la vittoria del TotoWrap</p></div>
   <script src="loading.js?v=21"></script>
-  <script>setTimeout(()=>{if(!document.getElementById("loadingScreen").hidden){document.getElementById("loadingMessage").textContent="La connessione sta impiegando più tempo del previsto. Verifica la rete e riprova.";document.getElementById("retryLoading").hidden=false}},15000);</script>
   <div class="shell">
     <header class="topbar">
       <button class="brand" data-route="today" aria-label="Vai a Oggi">
