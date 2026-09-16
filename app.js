@@ -47,8 +47,8 @@ const toSec = t => { if(!t)return null; const [h=0,m=0,s=0]=t.split(":").map(Num
 const clock = seconds => {const value=((Math.round(seconds)%DAY_SEC)+DAY_SEC)%DAY_SEC,h=Math.floor(value/3600),m=Math.floor(value%3600/60),s=value%60;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}${s?`:${String(s).padStart(2,"0")}`:""}`};
 const diff = t => { const a=toSec(t),b=toSec(state.wrapTime); if(a===null||b===null)return null;const raw=Math.abs(a-b);return Math.round(Math.min(raw,DAY_SEC-raw)/6)/10; };
 const chronologicalPlayers = players => [...players].sort((a,b)=>(toSec(a[3])??Infinity)-(toSec(b[3])??Infinity)||a[0].localeCompare(b[0],"it"));
-function bettingBands(){
-  const unique=[...new Set(state.players.map(p=>p[3]).filter(Boolean))].sort((a,b)=>toSec(a)-toSec(b));
+function bettingBands(players=state.players){
+  const unique=[...new Set(players.map(p=>p[3]).filter(Boolean))].sort((a,b)=>toSec(a)-toSec(b));
   const bands=new Map();
   if(!unique.length)return bands;
   if(unique.length===1){const c=toSec(unique[0]);bands.set(unique[0],{lower:c-1800,upper:c+1800,center:c});return bands}
@@ -115,11 +115,26 @@ function betOffsetSeconds(bet,wrap){
   if(delta<-DAY_SEC/2)delta+=DAY_SEC;
   return delta;
 }
+function wrongBandDistance(item,day){
+  if(item.points!==0||!item.bet||!day[3])return null;
+  let band=item.bandBounds;
+  if(!band&&item.band){
+    const [start,end]=item.band.split("–");
+    const lower=toSec(start);let upper=toSec(end);
+    if(lower!==null&&upper!==null){if(upper<lower)upper+=DAY_SEC;band={lower,upper,center:(lower+upper)/2}}
+  }
+  if(!band)band=bettingBands((day[6]||[]).filter(p=>p.bet).map(p=>[p.name,0,0,p.bet])).get(item.bet);
+  if(!band)return null;
+  let wrap=toSec(day[3]);
+  while(wrap<band.center-DAY_SEC/2)wrap+=DAY_SEC;
+  while(wrap>band.center+DAY_SEC/2)wrap-=DAY_SEC;
+  return wrap<band.lower?band.lower-wrap:wrap>band.upper?wrap-band.upper:null;
+}
 function participantStats(player){
   const days=[...state.history].sort((a,b)=>b[0]-a[0]);
   const records=days.flatMap(day=>(Array.isArray(day[6])?day[6]:[]).filter(item=>item.name===player[0]).map(item=>({item,day})));
   const exact=records.filter(r=>r.item.points===3).length;
-  const wrong=records.filter(r=>r.item.points===0).map(r=>betOffsetSeconds(r.item.bet,r.day[3])).filter(v=>v!==null).map(Math.abs);
+  const wrong=records.map(r=>wrongBandDistance(r.item,r.day)).filter(v=>v!==null);
   const forgotten=days.filter(day=>Array.isArray(day[7])&&day[7].includes(player[0])&&!(day[6]||[]).some(item=>item.name===player[0]&&item.bet)).length;
   const previous=days[0],last=previous&&(previous[6]||[]).find(item=>item.name===player[0]);
   const offset=last?betOffsetSeconds(last.bet,previous[3]):null;
@@ -129,7 +144,7 @@ function participantStats(player){
 }
 function participantDetails(player){
   const s=participantStats(player);
-  return `<div class="participant-detail"><p class="last-bet">${esc(s.lastLabel)}</p><div class="participant-metrics"><div><strong>${player[2]}</strong><span>Vittorie totali</span></div><div><strong>${s.exact}</strong><span>Vittorie esatte</span></div><div><strong>${s.forgotten}</strong><span>Bet dimenticate</span></div><div><strong>${s.closest===null?"—":`${s.closest}s`}</strong><span>Closest wrong bet</span></div></div><p class="field-note">Closest wrong bet: la bet senza punti più vicina al wrap.${s.incomplete?" Le bet dimenticate sono conteggiate solo nelle giornate con elenco partecipanti registrato; le vecchie assenze non sono ricostruibili.":""}</p></div>`;
+return `<div class="participant-detail"><p class="last-bet">${esc(s.lastLabel)}</p><div class="participant-metrics"><div><strong>${player[2]}</strong><span>Vittorie totali</span></div><div><strong>${s.exact}</strong><span>Vittorie esatte</span></div><div><strong>${s.forgotten}</strong><span>Bet dimenticate</span></div><div><strong>${s.closest===null?"—":`${s.closest}s`}</strong><span>Closest wrong bet</span></div></div><p class="field-note">Closest wrong bet: secondi dal wrap al confine più vicino della fascia, soltanto per le bet perdenti.${s.incomplete?" Le bet dimenticate sono conteggiate solo nelle giornate con elenco partecipanti registrato; le vecchie assenze non sono ricostruibili.":""}</p></div>`;
 }
 function tablesView(){
   return `<div class="tables-view"><div class="tables-tabs" role="group" aria-label="Sezioni di Tabelle"><button data-tables-tab="standings" class="${tablesTab==="standings"?"active":""}" aria-pressed="${tablesTab==="standings"}">Classifica</button><button data-tables-tab="accuracy" class="${tablesTab==="accuracy"?"active":""}" aria-pressed="${tablesTab==="accuracy"}">Precisione</button></div>${tablesTab==="accuracy"?accuracyView():standingsView()}</div>`;
@@ -264,7 +279,7 @@ async function closeDayAt(wrap,successMessage){
     state.players.forEach(p=>{
       if(!p[3])return;
       const pts=pointsFor(p[3]),distance=diff(p[3]);
-      dayDetails.push({name:p[0],bet:p[3],errorMin:distance,points:pts,band:bandLabel(p[3])});
+      dayDetails.push({name:p[0],bet:p[3],errorMin:distance,points:pts,band:bandLabel(p[3]),bandBounds:bandFor(p[3])});
       p[1]+=pts;
       if(pts>0){p[2]+=1;scorers.push([p[0],p[3],pts])}
       p[4]=((p[4]*p[5])+distance)/(p[5]+1);
