@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { getFirestore, doc, onSnapshot, setDoc, getDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -14,6 +14,7 @@ const firebaseApp=initializeApp(firebaseConfig);
 const db=getFirestore(firebaseApp);
 const auth=getAuth(firebaseApp);
 const STATE_REF=doc(db,"totowrap","state");
+const DRAFT_REF=doc(db,"totowrap-private","draft");
 const ADMIN_UID="4hgyioeFlcYixjF2DpRAxzVVowL2";
 
 const original = {
@@ -21,6 +22,8 @@ const original = {
   estimatedTime: "",
   wrapTime: "",
   dayClosed: false,
+  betsPublished: false,
+  betClosingTime: "",
   players: [],
   history: []
 };
@@ -32,6 +35,8 @@ let route = (location.hash || "#today").slice(1);
 let accuracyOrder = "best";
 let accuracyPlayer = null;
 let tablesTab = "standings";
+let privateBets={};
+let draftDay=null;
 
 const app = document.querySelector("#app");
 const qs = s => document.querySelector(s);
@@ -77,7 +82,9 @@ const persist = async () => {
   if(!isAdmin)throw new Error("Accesso amministratore richiesto");
   // Firestore non consente array annidati. Salviamo quindi lo stato come JSON:
   // il formato interno dell'app resta invariato e partecipanti/storico funzionano.
-  await setDoc(STATE_REF,{payload:JSON.stringify(clone(state)),updatedAt:serverTimestamp()});
+  const publicState=clone(state);
+  if(!publicState.betsPublished)publicState.players.forEach(p=>p[3]=null);
+  await setDoc(STATE_REF,{payload:JSON.stringify(publicState),updatedAt:serverTimestamp()});
 };
 
 function liveClock(){
@@ -87,6 +94,7 @@ function liveClock(){
 }
 
 function todayView(){
+  if(!state.betsPublished)return `<section class="view"><div class="hero-grid"><article class="clock-card"><span class="eyebrow">L'orologio di oggi</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span></article><article class="bet-closing"><span class="eyebrow">Bet closing at</span><strong>${esc(state.betClosingTime||"--:--")}</strong><p>Ready to shoot · Giorno ${state.day}</p></article></div><div class="card awaiting-bets"><h1>Le bet sono ancora riservate</h1><p>Compariranno qui quando l'amministratore cliccherà “Pubblica bet”.</p></div></section>`;
   const withBets=state.players.filter(p=>p[3]);
   return `<section class="view"><div class="hero-grid">
     <article class="clock-card"><span class="eyebrow">L'orologio di oggi</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span></article>
@@ -168,7 +176,13 @@ return `<article class="card trend-card"><div class="trend-head"><div><span clas
 }
 
 function historyView(){
- return `<section class="view"><div class="section-head"><div><span class="eyebrow">ARCHIVIO</span><h1>Storico giornate</h1></div><p>Apri una giornata per i dettagli</p></div><div class="history-list">${state.history.map(h=>`<article class="card history-row"><button class="history-summary" aria-expanded="false"><span class="history-day">Giorno ${h[0]}</span><span class="history-winner"><strong>${esc(h[1])} ${award(h[4])}</strong><small>Bet vincente ${h[2]}</small></span><span class="history-score">+${h[4]} pt</span><span>⌄</span></button><div class="history-detail"><div class="mini"><span>Vincitore</span><strong>${esc(h[1])} ${award(h[4])}</strong></div><div class="mini"><span>Bet</span><strong>${h[2]}</strong></div><div class="mini"><span>Fine stimata</span><strong>${h[5]||"—"}</strong></div><div class="mini"><span>Wrap ufficiale</span><strong>${h[3]}</strong></div></div></article>`).join("")}</div></section>`;
+ return `<section class="view"><div class="section-head"><div><span class="eyebrow">Archivio TotoWrap</span><h1>Storico giornate</h1></div><p>Apri una giornata per vedere tutte le bet</p></div><div class="history-list">${state.history.map(h=>{
+   const details=Array.isArray(h[6])?h[6]:[],winners=details.filter(item=>item.points>0);
+   const winnerMarkup=winners.length?winners.map(item=>`<span class="historical-winner">${esc(item.name)} ${award(item.points)}<small>Bet ${esc(item.bet)} · +${item.points} pt</small></span>`).join(""):h[4]>0?String(h[1]).split(" · ").map(name=>`<span class="historical-winner">${esc(name)} ${award(h[4])}<small>Bet ${esc(h[2])}</small></span>`).join(""):"Nessun vincitore";
+   const roster=Array.isArray(h[7])?h[7]:details.map(item=>item.name);
+   const rows=[...details,...roster.filter(name=>!details.some(item=>item.name===name)).map(name=>({name,bet:null,points:0}))].sort((a,b)=>(toSec(a.bet)??Infinity)-(toSec(b.bet)??Infinity)||a.name.localeCompare(b.name,"it"));
+   return `<article class="card history-row"><button class="history-summary" aria-expanded="false"><span class="history-day">TotoWrap<br>Giorno ${esc(h[0])}</span><span class="history-winner">${winnerMarkup}</span><span class="history-official"><small>Wrap effettivo</small><strong>${esc(h[3])}</strong></span><span>⌄</span></button><div class="history-detail"><div class="history-meta"><span>Fine stimata <strong>${esc(h[5]||"—")}</strong></span><span>Wrap effettivo <strong>${esc(h[3])}</strong></span></div><h3>Tutte le bet della giornata</h3><ol class="history-bets">${rows.length?rows.map(item=>`<li class="history-bet${item.points>0?" winner":""}"><time>${esc(item.bet||"—")}</time><span class="history-bet-person">${esc(item.name)} ${award(item.points)}</span><span class="history-band">${esc(item.band||"")}</span><span class="pill ${!item.bet?"none":item.points===3?"win":item.points===1?"close":"out"}">${!item.bet?"Bet dimenticata":item.points===3?"ESATTO · 3 PT":item.points===1?"FASCIA · 1 PT":"💀 FUORI"}</span></li>`).join(""):`<li class="empty">Le altre bet non sono disponibili per questa vecchia giornata.</li>`}</ol></div></article>`;
+ }).join("")||`<div class="card empty">Non ci sono ancora giornate concluse.</div>`}</div></section>`;
 }
 
 function render(){
@@ -197,19 +211,46 @@ function setAdminTab(tab){
   document.querySelectorAll("[data-admin-page]").forEach(page=>page.classList.toggle("active",page.dataset.adminPage===tab));
 }
 function refreshPlayers(selected=0){
+  qs("#saveBets").textContent=state.betsPublished?"Salva modifiche alle bet pubblicate":"Salva bet private";
+  qs("#publishBets").hidden=state.betsPublished;
   playerInput.innerHTML=state.players.length?state.players.map((p,i)=>`<option value="${i}">${esc(p[0])}</option>`).join(""):`<option value="">Nessun partecipante</option>`;
   playerInput.value=state.players.length?String(Math.min(selected,state.players.length-1)):"";
-  qs("#bulkBets").innerHTML=state.players.length?state.players.map((p,i)=>`<label class="bulk-bet-row"><span>${esc(p[0])}</span><input type="time" step="1" value="${p[3]||""}" data-bet-index="${i}" aria-label="Bet di ${esc(p[0])}"></label>`).join(""):`<div class="bulk-empty">Aggiungi prima i partecipanti.</div>`;
+  qs("#bulkBets").innerHTML=state.players.length?state.players.map((p,i)=>`<label class="bulk-bet-row"><span>${esc(p[0])}</span><input type="time" step="1" value="${(state.betsPublished?p[3]:draftDay===state.day?privateBets[p[0]]:null)||""}" data-bet-index="${i}" aria-label="Bet di ${esc(p[0])}"></label>`).join(""):`<div class="bulk-empty">Aggiungi prima i partecipanti.</div>`;
 }
 async function mutateAndSave(mutator,success){const before=clone(state);mutator();try{await persist();render();toast(success);return true}catch(error){state=before;render();console.error(error);toast("Salvataggio non riuscito: riprova");return false}}
-qs("#openAdmin").addEventListener("click",()=>{if(!isAdmin){loginDialog.showModal();return}qs("#estimatedTimeInput").value=state.estimatedTime;qs("#wrapTimeInput").value=state.wrapTime;refreshPlayers();setAdminTab("bets");dialog.showModal()});
+async function openAdminSettings(){
+  if(!isAdmin)return;
+  qs("#estimatedTimeInput").value=state.estimatedTime;qs("#wrapTimeInput").value=state.wrapTime;qs("#betClosingTimeInput").value=state.betClosingTime;
+  if(!state.betsPublished){
+    try{const snapshot=await getDoc(DRAFT_REF),draft=snapshot.exists()?snapshot.data():null;privateBets=draft?.day===state.day?draft.bets||{}:{};draftDay=state.day}
+    catch(error){console.error(error);return toast("Bet private non accessibili: aggiorna prima le regole Firebase")}
+  }
+  refreshPlayers();setAdminTab("bets");dialog.showModal();
+}
+function enteredBets(){return [...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}))}
+async function savePrivateBets(){
+  if(!isAdmin||state.dayClosed||state.betsPublished)return false;
+  const day=state.day,bets=Object.fromEntries(enteredBets().map(item=>[state.players[item.index][0],item.time]));
+  try{await setDoc(DRAFT_REF,{day,bets,updatedAt:serverTimestamp()});if(day!==state.day)return false;privateBets=bets;draftDay=day;return true}
+  catch(error){console.error(error);toast("Salvataggio privato non riuscito: controlla le regole Firebase");return false}
+}
+qs("#publishBets").addEventListener("click",async()=>{
+  if(!isAdmin||state.dayClosed||state.betsPublished)return;
+  if(!state.betClosingTime)return toast("Imposta prima l'orario Bet closing at");
+  if(!enteredBets().some(item=>item.time))return toast("Inserisci almeno una bet");
+  if(!confirm("Pubblicare tutte le bet e rendere visibili gli orari a tutti?"))return;
+  const button=qs("#publishBets");button.disabled=true;
+  try{if(!await savePrivateBets())return;if(await mutateAndSave(()=>{state.players.forEach(p=>p[3]=privateBets[p[0]]||null);state.betsPublished=true},"Bet pubblicate per tutti"))dialog.close()}finally{button.disabled=false}
+});
+qs("#openAdmin").addEventListener("click",()=>{if(!isAdmin){loginDialog.showModal();return}openAdminSettings()});
 qs("#closeAdmin").addEventListener("click",()=>dialog.close());
 document.querySelectorAll("[data-admin-tab]").forEach(button=>button.addEventListener("click",()=>setAdminTab(button.dataset.adminTab)));
-betsForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const bets=[...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}));if(await mutateAndSave(()=>bets.forEach(item=>{if(state.players[item.index])state.players[item.index][3]=item.time}),"Tutte le bet sono state salvate"))dialog.close()});
-dayForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const estimated=qs("#estimatedTimeInput").value;if(!estimated)return toast("Inserisci la fine stimata");if(await mutateAndSave(()=>state.estimatedTime=estimated,"Fine stimata salvata"))dialog.close()});
+betsForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");if(!state.betsPublished){if(await savePrivateBets()){toast("Bet salvate in privato");dialog.close()}return}const bets=[...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}));if(await mutateAndSave(()=>bets.forEach(item=>{if(state.players[item.index])state.players[item.index][3]=item.time}),"Tutte le bet sono state salvate"))dialog.close()});
+dayForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const estimated=qs("#estimatedTimeInput").value,closing=qs("#betClosingTimeInput").value;if(await mutateAndSave(()=>{state.estimatedTime=estimated;state.betClosingTime=closing},"Orari della giornata salvati"))dialog.close()});
 qs("#addPlayer").addEventListener("click",async()=>{if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const input=qs("#newPlayerInput"),name=input.value.trim();if(!name)return toast("Inserisci un nome");if(state.players.some(p=>p[0].toLowerCase()===name.toLowerCase()))return toast("Partecipante già presente");if(await mutateAndSave(()=>state.players.push([name,0,0,null,0,0]),`${name} aggiunto`)){input.value="";refreshPlayers(state.players.length-1)}});
 qs("#removePlayer").addEventListener("click",async()=>{if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");if(playerInput.value==="")return;const idx=+playerInput.value,name=state.players[idx][0];if(!confirm(`Rimuovere ${name}?`))return;if(await mutateAndSave(()=>state.players.splice(idx,1),`${name} rimosso`))refreshPlayers(Math.max(0,idx-1))});
 async function closeDayAt(wrap,successMessage){
+  if(!state.betsPublished)return toast("Pubblica le bet prima di chiudere la giornata");
   if(state.dayClosed)return toast("Giornata già chiusa: avvia il giorno successivo");
   const estimated=qs("#estimatedTimeInput").value;
   const bets=[...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}));
@@ -223,7 +264,7 @@ async function closeDayAt(wrap,successMessage){
     state.players.forEach(p=>{
       if(!p[3])return;
       const pts=pointsFor(p[3]),distance=diff(p[3]);
-      dayDetails.push({name:p[0],bet:p[3],errorMin:distance,points:pts});
+      dayDetails.push({name:p[0],bet:p[3],errorMin:distance,points:pts,band:bandLabel(p[3])});
       p[1]+=pts;
       if(pts>0){p[2]+=1;scorers.push([p[0],p[3],pts])}
       p[4]=((p[4]*p[5])+distance)/(p[5]+1);
@@ -242,15 +283,16 @@ qs("#wrapNow").addEventListener("click",async()=>{
   await closeDayAt(exact,`Wrap ${exact}: punti assegnati`);
 });
 qs("#finalizeDay").addEventListener("click",()=>closeDayAt(qs("#wrapTimeInput").value,"Punti assegnati e giornata chiusa"));
-qs("#advanceDay").addEventListener("click",async()=>{const nextDay=state.day+1;if(!confirm(state.dayClosed?`Avviare il giorno ${nextDay}? I risultati del giorno ${state.day} resteranno nello storico.`:`Passare al giorno ${nextDay} senza assegnare punti? Le bet e gli orari della giornata ${state.day} verranno cancellati.`))return;const saved=await mutateAndSave(()=>{state.day=nextDay;state.dayClosed=false;state.estimatedTime="";state.wrapTime="";state.players.forEach(p=>p[3]=null)},`Giorno ${nextDay} avviato`);if(saved){dialog.close();route="today";location.hash=route;render()}});
-qs("#resetDemo").addEventListener("click",async()=>{if(!confirm("Azzerare partecipanti, classifica, precisione e storico?"))return;if(await mutateAndSave(()=>state=clone(original),"TotoWrap azzerato: si riparte dal giorno 1"))dialog.close()});
-loginForm.addEventListener("submit",async e=>{e.preventDefault();const button=loginForm.querySelector("button[type=submit]");button.disabled=true;button.textContent="Accesso…";try{const credential=await signInWithEmailAndPassword(auth,qs("#loginEmail").value.trim(),qs("#loginPassword").value);if(credential.user.uid!==ADMIN_UID){await signOut(auth);throw new Error("Utente non autorizzato")}qs("#loginPassword").value="";loginDialog.close();qs("#estimatedTimeInput").value=state.estimatedTime;qs("#wrapTimeInput").value=state.wrapTime;refreshPlayers();setAdminTab("bets");dialog.showModal();toast("Accesso amministratore effettuato")}catch(error){console.error(error);toast("Email o password non corretti")}finally{button.disabled=false;button.textContent="Accedi"}});
+qs("#advanceDay").addEventListener("click",async()=>{const nextDay=state.day+1;if(!confirm(state.dayClosed?`Avviare il giorno ${nextDay}? I risultati del giorno ${state.day} resteranno nello storico.`:`Passare al giorno ${nextDay} senza assegnare punti? Le bet e gli orari della giornata ${state.day} verranno cancellati.`))return;const saved=await mutateAndSave(()=>{state.day=nextDay;state.betsPublished=false;state.betClosingTime="";privateBets={};draftDay=null;state.dayClosed=false;state.estimatedTime="";state.wrapTime="";state.players.forEach(p=>p[3]=null)},`Giorno ${nextDay} avviato`);if(saved){dialog.close();route="today";location.hash=route;render()}});
+qs("#resetDemo").addEventListener("click",async()=>{if(!confirm("Azzerare partecipanti, classifica, precisione e storico?"))return;try{await deleteDoc(DRAFT_REF)}catch(error){return toast("Reset non riuscito: controlla le regole Firebase")}privateBets={};draftDay=null;if(await mutateAndSave(()=>state=clone(original),"TotoWrap azzerato: si riparte dal giorno 1"))dialog.close()});
+loginForm.addEventListener("submit",async e=>{e.preventDefault();const button=loginForm.querySelector("button[type=submit]");button.disabled=true;button.textContent="Accesso…";try{const credential=await signInWithEmailAndPassword(auth,qs("#loginEmail").value.trim(),qs("#loginPassword").value);if(credential.user.uid!==ADMIN_UID){await signOut(auth);throw new Error("Utente non autorizzato")}qs("#loginPassword").value="";loginDialog.close();await openAdminSettings();toast("Accesso amministratore effettuato")}catch(error){console.error(error);toast("Email o password non corretti")}finally{button.disabled=false;button.textContent="Accedi"}});
 qs("#closeLogin").addEventListener("click",()=>loginDialog.close());
 qs("#signOutBtn").addEventListener("click",async()=>{dialog.close();await signOut(auth);toast("Accesso amministratore terminato")});
 function toast(text){const t=qs("#toast");t.textContent=text;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
 
-onAuthStateChanged(auth,user=>{isAdmin=user?.uid===ADMIN_UID;qs("#openAdmin").classList.toggle("admin-on",isAdmin);qs("#openAdmin").title=isAdmin?"Gestione amministratore":"Accesso amministratore";if(user&&!isAdmin)signOut(auth)});
+onAuthStateChanged(auth,user=>{isAdmin=user?.uid===ADMIN_UID;qs("#openAdmin").classList.toggle("admin-on",isAdmin);qs("#openAdmin").title=isAdmin?"Gestione amministratore":"Accesso amministratore";if(!isAdmin){privateBets={};draftDay=null}if(user&&!isAdmin)signOut(auth)});
 onSnapshot(STATE_REF,snapshot=>{
+  qs("#loadingScreen").hidden=true;
   if(!snapshot.exists())return;
   const stored=snapshot.data();
   let remote=stored;
@@ -258,7 +300,7 @@ onSnapshot(STATE_REF,snapshot=>{
     try{remote=JSON.parse(stored.payload)}
     catch(error){console.error(error);toast("Dati del database non validi");return}
   }
-  state={...clone(original),...remote,players:Array.isArray(remote.players)?remote.players:[],history:Array.isArray(remote.history)?remote.history:[]};
+  state={...clone(original),...remote,betsPublished:typeof remote.betsPublished==="boolean"?remote.betsPublished:(remote.players||[]).some(p=>p[3])||!!remote.dayClosed,players:Array.isArray(remote.players)?remote.players:[],history:Array.isArray(remote.history)?remote.history:[]};
   render();
 },error=>{console.error(error);toast("Database temporaneamente non disponibile")});
 
