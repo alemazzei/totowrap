@@ -39,7 +39,7 @@ const DAY_SEC=86400;
 const toSec = t => { if(!t)return null; const [h=0,m=0,s=0]=t.split(":").map(Number); return h*3600+m*60+s; };
 const clock = seconds => {const value=((Math.round(seconds)%DAY_SEC)+DAY_SEC)%DAY_SEC,h=Math.floor(value/3600),m=Math.floor(value%3600/60),s=value%60;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}${s?`:${String(s).padStart(2,"0")}`:""}`};
 const diff = t => { const a=toSec(t),b=toSec(state.wrapTime); if(a===null||b===null)return null;const raw=Math.abs(a-b);return Math.round(Math.min(raw,DAY_SEC-raw)/6)/10; };
-const distanceFrom = (t,reference) => {const a=toSec(t),b=toSec(reference);if(a===null||b===null)return null;const raw=Math.abs(a-b);return Math.min(raw,DAY_SEC-raw)};
+const chronologicalPlayers = players => [...players].sort((a,b)=>(toSec(a[3])??Infinity)-(toSec(b[3])??Infinity)||a[0].localeCompare(b[0],"it"));
 function bettingBands(){
   const unique=[...new Set(state.players.map(p=>p[3]).filter(Boolean))].sort((a,b)=>toSec(a)-toSec(b));
   const bands=new Map();
@@ -75,17 +75,16 @@ function liveClock(){
 
 function todayView(){
   const withBets=state.players.filter(p=>p[3]);
-  const referenceTime=state.wrapTime||state.estimatedTime;
-  const referenceLabel=state.wrapTime?"wrap effettivo":state.estimatedTime?"fine stimata":"orario";
   return `<section class="view"><div class="hero-grid">
-    <article class="card clock-card"><span class="eyebrow">ORA UFFICIALE LIVE</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span></article>
+    <article class="clock-card"><span class="eyebrow">L'orologio di oggi</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span></article>
     <div class="time-cards">
-      <article class="card time-card estimated-card"><span class="eyebrow">FINE STIMATA</span><strong>${esc(state.estimatedTime||"--:--")}</strong><p>Orario indicativo per scegliere la bet</p></article>
-      <article class="card time-card actual-card"><span class="eyebrow">WRAP EFFETTIVO</span><strong>${esc(state.wrapTime||"--:--")}</strong><p>${state.wrapTime?"Orario ufficiale":"Da confermare a fine giornata"}</p></article>
-      <div class="rules"><div class="rule"><strong>3 punti</strong><span>minuto esatto</span></div><div class="rule"><strong>1 punto</strong><span>fascia automatica</span></div><div class="rule"><strong>${withBets.length}</strong><span>bet inserite</span></div></div>
+      <article class="time-card estimated-card"><span class="eyebrow">Fine stimata</span><strong>${esc(state.estimatedTime||"--:--")}</strong><p>La previsione di fine giornata</p></article>
+      <article class="time-card actual-card"><span class="eyebrow">Wrap effettivo</span><strong>${esc(state.wrapTime||"--:--")}</strong><p>${state.wrapTime?"Orario ufficiale":"Ancora da confermare"}</p></article>
     </div>
-  </div><div class="section-head"><div><span class="eyebrow">GIORNATA ${state.day}</span><h1>Le bet di oggi</h1></div><p>Ordinate dalla più vicina alla ${referenceLabel}</p></div>
-  <div class="bets">${state.players.length?[...state.players].sort((a,b)=>(distanceFrom(a[3],referenceTime)??999999)-(distanceFrom(b[3],referenceTime)??999999)).map(p=>{const s=status(p[3]);return `<article class="card bet-card"><div class="avatar">${initials(p[0])}</div><div><h3>${esc(p[0])}</h3><div class="bet-meta">${p[3]?`Fascia ${bandLabel(p[3])}`:"Non ha giocato"}</div></div><div><div class="bet-time">${p[3]||"—"}</div><span class="pill ${s[1]}">${s[0]}</span></div></article>`}).join(""):`<div class="card empty">Aggiungi i partecipanti dal pulsante Gestione.</div>`}</div></section>`;
+  </div><div class="section-head"><div><span class="eyebrow">Giornata ${state.day}</span><h1>Le bet di oggi</h1></div><span class="count-label">${withBets.length} ${withBets.length===1?"bet inserita":"bet inserite"}</span></div>
+  <div class="bet-list"><div class="bet-list-head"><span>Orario</span><span>Partecipante</span><span>Fascia di gioco</span><span>Stato</span></div>
+  <ol class="bets">${state.players.length?chronologicalPlayers(state.players).map(p=>{const s=status(p[3]);return `<li class="bet-row${p[3]?"":" no-bet"}"><time class="bet-time">${esc(p[3]||"—")}</time><div class="bet-person"><div class="avatar" aria-hidden="true">${esc(initials(p[0]))}</div><h3>${esc(p[0])}</h3></div><div class="bet-range">${p[3]?`<span class="mobile-range-label">Fascia </span>${bandLabel(p[3])}`:"Bet non inserita"}</div><span class="pill ${s[1]}">${s[0]}</span></li>`}).join(""):`<li class="empty">Aggiungi i partecipanti dalle impostazioni.</li>`}</ol></div>
+  <p class="bet-footnote">Dall'orario più presto al più tardi. <span>3 punti per il minuto esatto · 1 punto per la fascia.</span></p></section>`;
 }
 
 function standingsView(){
@@ -97,15 +96,16 @@ function standingsView(){
 }
 
 function accuracyView(){
-  const sorted=[...state.players].sort((a,b)=>{if(!a[5]&&!b[5])return a[0].localeCompare(b[0]);if(!a[5])return 1;if(!b[5])return -1;return accuracyOrder==="best"?a[4]-b[4]:b[4]-a[4]}); const max=Math.max(1,...sorted.map(p=>p[4]));
+  const sorted=[...state.players].sort((a,b)=>{if(!a[5]&&!b[5])return a[0].localeCompare(b[0]);if(!a[5])return 1;if(!b[5])return -1;return accuracyOrder==="best"?a[4]-b[4]:b[4]-a[4]});
+  if(!state.players.some(p=>p[0]===accuracyPlayer))accuracyPlayer=sorted[0]?.[0]||"";
   if(!sorted.length)return `<section class="view"><div class="section-head"><div><span class="eyebrow">STATISTICHE</span><h1>Precisione media</h1></div></div><div class="card empty">Le statistiche appariranno dopo le prime giornate.</div></section>`;
   return `<section class="view"><div class="section-head"><div><span class="eyebrow">STATISTICHE</span><h1>Precisione media</h1></div><div class="segmented"><button class="${accuracyOrder==="best"?"active":""}" data-order="best">Più precisi</button><button class="${accuracyOrder==="worst"?"active":""}" data-order="worst">Meno precisi</button></div></div>
-  <div class="accuracy-grid">${sorted.map((p,i)=>{const winRate=p[5]?Math.round(p[2]/p[5]*100):0;return `<article class="card accuracy-card"><div class="accuracy-top"><div><span class="place">#${i+1}</span><h3>${esc(p[0])}</h3></div><div class="accuracy-result"><div class="accuracy-value">${p[5]?fmtAvg(p[4]):"—"}</div><span class="win-rate">${winRate}% vittorie</span></div></div><div class="accuracy-track"><i style="width:${p[5]?Math.max(5,100-(p[4]/max*82)):0}%"></i></div><div class="accuracy-stats"><span>Errore medio dal wrap</span><span>${p[2]} ${p[2]===1?"vittoria":"vittorie"} su ${p[5]} bet</span></div></article>`}).join("")}</div>${accuracyChart()}</section>`;
+  ${accuracyChart()}<p class="helper">Seleziona un partecipante per vedere il suo percorso nel grafico.</p><div class="card accuracy-list">${sorted.map((p,i)=>{const winRate=p[5]?Math.round(p[2]/p[5]*100):0;return `<button class="accuracy-row${p[0]===accuracyPlayer?" selected":""}" data-accuracy-name="${esc(p[0])}" aria-pressed="${p[0]===accuracyPlayer}"><span class="rank-no">${i+1}</span><span class="bet-person"><span class="avatar">${esc(initials(p[0]))}</span><strong>${esc(p[0])}</strong></span><span class="accuracy-average"><strong>${p[5]?fmtAvg(p[4]):"—"}</strong><small>Errore medio</small></span><span class="accuracy-wins"><strong>${winRate}% vittorie</strong><small>${p[2]} su ${p[5]} bet</small></span><span aria-hidden="true">↗</span></button>`}).join("")}</div></section>`;
 }
 
 function accuracyChart(){
   const seriesByPlayer=new Map();
-  [...state.history].reverse().forEach(day=>{
+  [...state.history].sort((a,b)=>a[0]-b[0]).forEach(day=>{
     const details=Array.isArray(day[6])?day[6]:[];
     details.forEach(item=>{
       if(!item?.name||!Number.isFinite(item.errorMin))return;
@@ -113,19 +113,19 @@ function accuracyChart(){
       seriesByPlayer.get(item.name).push({day:day[0],error:item.errorMin,won:item.points>0});
     });
   });
-  const names=state.players.map(p=>p[0]).filter(name=>seriesByPlayer.has(name));
-  if(!names.length)return `<article class="card trend-card"><div class="trend-head"><div><span class="eyebrow">ANDAMENTO NEL TEMPO</span><h2>Errore dal wrap per giornata</h2></div></div><div class="trend-empty">Il grafico si aggiornerà automaticamente dopo la prima giornata chiusa.</div></article>`;
-  if(!names.includes(accuracyPlayer))accuracyPlayer=names[0];
   const points=seriesByPlayer.get(accuracyPlayer)||[];
+  if(!points.length)return `<article class="card trend-card"><div class="trend-head"><div><span class="eyebrow">Il percorso di ${esc(accuracyPlayer)}</span><h2>Distanza dal wrap effettivo</h2></div></div><div class="trend-empty">Nessuna giornata conclusa con una bet di questo partecipante. Il grafico si aggiornerà alla chiusura della giornata.</div></article>`;
   const W=820,H=310,L=62,R=24,T=32,B=48,plotW=W-L-R,plotH=H-T-B;
   const maxError=Math.max(1,...points.map(p=>p.error));
   const scaleMax=Math.max(5,Math.ceil(maxError/5)*5);
-  const x=(i)=>points.length===1?L+plotW/2:L+(i/(points.length-1))*plotW;
+  const firstDay=1,lastDay=Math.max(1,state.day-1,...state.history.map(h=>Number(h[0])));
+  const x=(i)=>firstDay===lastDay?L+plotW/2:L+(points[i].day-firstDay)/(lastDay-firstDay)*plotW;
   const y=(value)=>T+plotH-(value/scaleMax)*plotH;
   const ticks=[0,.25,.5,.75,1].map(ratio=>{const value=scaleMax*ratio,py=y(value);return `<g><line x1="${L}" y1="${py}" x2="${W-R}" y2="${py}" class="chart-grid"/><text x="${L-10}" y="${py+4}" class="chart-label" text-anchor="end">${Math.round(value)}m</text></g>`}).join("");
-  const path=points.map((p,i)=>`${i?"L":"M"}${x(i).toFixed(1)} ${y(p.error).toFixed(1)}`).join(" ");
-  const markers=points.map((p,i)=>`<g><circle cx="${x(i)}" cy="${y(p.error)}" r="${p.won?7:5}" class="chart-point${p.won?" won":""}"><title>Giorno ${p.day}: ${fmtAvg(p.error)} dal wrap${p.won?" · vittoria":""}</title></circle><text x="${x(i)}" y="${H-20}" class="chart-label" text-anchor="middle">G${p.day}</text></g>`).join("");
-  return `<article class="card trend-card"><div class="trend-head"><div><span class="eyebrow">ANDAMENTO NEL TEMPO</span><h2>Errore dal wrap per giornata</h2></div><label>Partecipante<select data-accuracy-player>${names.map(name=>`<option value="${esc(name)}" ${name===accuracyPlayer?"selected":""}>${esc(name)}</option>`).join("")}</select></label></div><div class="chart-wrap"><svg class="trend-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Andamento della precisione di ${esc(accuracyPlayer)}"><line x1="${L}" y1="${T}" x2="${L}" y2="${H-B}" class="chart-axis"/><line x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}" class="chart-axis"/>${ticks}<path d="${path}" class="chart-line"/>${markers}<text x="18" y="${T+plotH/2}" class="chart-title-y" text-anchor="middle" transform="rotate(-90 18 ${T+plotH/2})">Errore dal wrap</text><text x="${L+plotW/2}" y="${H-2}" class="chart-title-x" text-anchor="middle">Giornate</text></svg></div><div class="chart-legend"><span><i></i>${esc(accuracyPlayer)}</span><span><i class="won"></i>Giornata vinta</span><small>Più il punto è vicino allo zero, più precisa è stata la bet.</small></div></article>`;
+  const path=points.map((p,i)=>`${i&&p.day===points[i-1].day+1?"L":"M"}${x(i).toFixed(1)} ${y(p.error).toFixed(1)}`).join(" ");
+  const dayLabels=Array.from({length:lastDay},(_,i)=>i+1).map(day=>{const px=firstDay===lastDay?L+plotW/2:L+(day-firstDay)/(lastDay-firstDay)*plotW;return `<line x1="${px}" y1="${H-B}" x2="${px}" y2="${H-B+5}" class="chart-axis"/><text x="${px}" y="${H-20}" class="chart-label" text-anchor="middle">G${day}</text>`}).join("");
+const markers=points.map((p,i)=>`<g><title>Giorno ${p.day}: ${fmtAvg(p.error)} dal wrap${p.won?" · vittoria":""}</title>${p.won?`<circle cx="${x(i)}" cy="${y(p.error)}" r="18" fill="white" stroke="#d64557"/><image href="gu3-logo.png" x="${x(i)-15}" y="${y(p.error)-15}" width="30" height="30" preserveAspectRatio="xMidYMid meet"/>`:`<circle cx="${x(i)}" cy="${y(p.error)}" r="5" class="chart-point"/>`}</g>`).join("");
+return `<article class="card trend-card"><div class="trend-head"><div><span class="eyebrow">Il percorso di ${esc(accuracyPlayer)}</span><h2>Distanza dal wrap effettivo</h2></div></div><div class="chart-wrap"><svg class="trend-chart" style="min-width:${Math.max(620,lastDay*45)}px" viewBox="0 0 ${W} ${H}" role="img" aria-label="Andamento della precisione di ${esc(accuracyPlayer)}"><line x1="${L}" y1="${T}" x2="${L}" y2="${H-B}" class="chart-axis"/><line x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}" class="chart-axis"/>${ticks}<path d="${path}" class="chart-line"/>${markers}${dayLabels}<text x="18" y="${T+plotH/2}" class="chart-title-y" text-anchor="middle" transform="rotate(-90 18 ${T+plotH/2})">Distanza dal wrap (minuti)</text><text x="${L+plotW/2}" y="${H-2}" class="chart-title-x" text-anchor="middle">Giornate</text></svg></div><div class="chart-legend"><span><i></i>${esc(accuracyPlayer)}</span><span><img src="gu3-logo.png" alt="" width="32" height="32">Minuto o fascia indovinati</span><small>Più vicino allo zero = più preciso. Giorni senza bet: vuoti e esclusi dalla media.</small></div></article>`;
 }
 
 function historyView(){
@@ -144,6 +144,7 @@ function render(){
 document.addEventListener("click",e=>{
   const nav=e.target.closest("[data-route]"); if(nav){route=nav.dataset.route;location.hash=route;render()}
   const order=e.target.closest("[data-order]"); if(order){accuracyOrder=order.dataset.order;render()}
+  const person=e.target.closest("[data-accuracy-name]");if(person){accuracyPlayer=person.dataset.accuracyName;render()}
   const row=e.target.closest(".history-summary"); if(row){const parent=row.closest(".history-row");parent.classList.toggle("open");row.setAttribute("aria-expanded",parent.classList.contains("open"))}
 });
 document.addEventListener("change",e=>{const select=e.target.closest("[data-accuracy-player]");if(select){accuracyPlayer=select.value;render()}});
