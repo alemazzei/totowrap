@@ -307,17 +307,17 @@ function toast(text){const t=qs("#toast");t.textContent=text;t.classList.add("sh
 
 onAuthStateChanged(auth,user=>{isAdmin=user?.uid===ADMIN_UID;qs("#openAdmin").classList.toggle("admin-on",isAdmin);qs("#openAdmin").title=isAdmin?"Gestione amministratore":"Accesso amministratore";if(!isAdmin){privateBets={};draftDay=null}if(user&&!isAdmin)signOut(auth)});
 onSnapshot(STATE_REF,snapshot=>{
-  qs("#loadingScreen").hidden=true;
-  if(!snapshot.exists())return;
+  if(!snapshot.exists()){render();window.totowrapReady?.();return}
   const stored=snapshot.data();
   let remote=stored;
   if(typeof stored.payload==="string"){
     try{remote=JSON.parse(stored.payload)}
-    catch(error){console.error(error);toast("Dati del database non validi");return}
+    catch(error){console.error(error);window.totowrapLoadFailed?.();toast("Dati del database non validi");return}
   }
   state={...clone(original),...remote,betsPublished:typeof remote.betsPublished==="boolean"?remote.betsPublished:(remote.players||[]).some(p=>p[3])||!!remote.dayClosed,players:Array.isArray(remote.players)?remote.players:[],history:Array.isArray(remote.history)?remote.history:[]};
   render();
-},error=>{console.error(error);toast("Database temporaneamente non disponibile")});
+  window.totowrapReady?.();
+},error=>{console.error(error);window.totowrapLoadFailed?.();toast("Database temporaneamente non disponibile")});
 
 if(document.modelContext?.registerTool){
   document.modelContext.registerTool({name:"open_totowrap_section",title:"Apri sezione TotoWrap",description:"Apre una sezione del sito tra today, standings, accuracy e history.",inputSchema:{type:"object",properties:{section:{type:"string",enum:["today","standings","accuracy","history"]}},required:["section"],additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:false},execute:({section})=>{route=section;location.hash=section;render();return{section}}});
