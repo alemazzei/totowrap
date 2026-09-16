@@ -11,6 +11,7 @@ dialog{border:0;padding:0;background:transparent;color:var(--ink);width:min(640p
 @media(max-width:620px){.trend-head{align-items:stretch;flex-direction:column}.trend-head select{width:100%}.trend-card{padding:17px}.chart-legend small{margin-left:0;width:100%}}
 @media(max-width:420px){.brand>span:last-child{display:none}.target-card{grid-template-columns:1fr 116px}.target-ring{width:116px;height:116px}.bet-card{grid-template-columns:40px 1fr auto}.avatar{width:40px;height:40px}.history-score{font-size:.85rem}}
 
+.bet-row.winner{background:#edf5ff;box-shadow:inset 4px 0 #345dd0}.bet-row.winner .bet-person h3{color:#24499f}.award{display:inline-block;margin-left:5px;font-size:1.35rem;vertical-align:middle}.bet-row.eliminated{background:#dce2eb}.bet-row.eliminated .bet-time,.bet-row.eliminated h3{color:#626c7c}.bet-row.eliminated .avatar{background:#c9d1de;color:#596578}.bet-row.eliminated .pill{background:#cbd4e2;color:#44526a}
 /* Soft, shared-list layout */
 body{background:radial-gradient(ellipse at 90% 5%,#eaf0ff,transparent 40%),var(--bg);line-height:1.5}
 .shell{width:min(1080px,100%);padding:0 32px 52px}

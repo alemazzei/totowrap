@@ -20,6 +20,7 @@ const original = {
   day: 1,
   estimatedTime: "",
   wrapTime: "",
+  dayClosed: false,
   players: [],
   history: []
 };
@@ -58,7 +59,18 @@ const bandFor = t => bettingBands().get(t);
 const inBand = (bet,wrap=state.wrapTime) => {const band=bandFor(bet),raw=toSec(wrap);if(!band||raw===null)return false;let adjusted=raw;while(adjusted<band.center-DAY_SEC/2)adjusted+=DAY_SEC;while(adjusted>band.center+DAY_SEC/2)adjusted-=DAY_SEC;return adjusted>=band.lower&&adjusted<=band.upper};
 const pointsFor = t => { if(!t||!state.wrapTime)return 0; if(t.slice(0,5)===state.wrapTime.slice(0,5))return 3; return inBand(t)?1:0; };
 const bandLabel = t => {const band=bandFor(t);return band?`${clock(band.lower)}–${clock(band.upper)}`:"—"};
-const status = t => { if(!t)return ["Nessuna bet","none"];if(!state.wrapTime)return ["IN GIOCO","pending"];const pts=pointsFor(t); if(pts===3)return ["ESATTO · 3 PT","win"]; if(pts===1)return ["FASCIA · 1 PT","close"]; return ["FUORI","out"]; };
+const award = points => points===3?'<span class="award" role="img" aria-label="Vittoria per minuto esatto">🏆</span>':points===1?'<span class="award" role="img" aria-label="Vittoria per fascia oraria">🥇</span>':"";
+function expiredBet(t,now=new Date()){
+  const band=bandFor(t);if(!band)return false;
+  let seconds=now.getHours()*3600+now.getMinutes()*60+now.getSeconds();
+  while(seconds<band.center-DAY_SEC/2)seconds+=DAY_SEC;
+  while(seconds>band.center+DAY_SEC/2)seconds-=DAY_SEC;
+  return seconds>band.upper;
+}
+const status = t => { if(!t)return ["Nessuna bet","none"];if(!state.wrapTime)return expiredBet(t)?["💀 FUORI","out"]:["IN GIOCO","pending"];const pts=pointsFor(t); if(pts===3)return ["ESATTO · 3 PT","win"]; if(pts===1)return ["FASCIA · 1 PT","close"]; return ["💀 FUORI","out"]; };
+function updateLiveBets(){
+  document.querySelectorAll(".bet-row[data-bet]").forEach(row=>{const s=status(row.dataset.bet);row.classList.toggle("eliminated",s[1]==="out");const pill=row.querySelector(".pill");pill.className=`pill ${s[1]}`;pill.textContent=s[0]});
+}
 const fmtAvg = m => `${Math.floor(m)}m${Math.round((m%1)*60).toString().padStart(2,"0")}s`;
 const persist = async () => {
   if(!isAdmin)throw new Error("Accesso amministratore richiesto");
@@ -69,7 +81,7 @@ const persist = async () => {
 
 function liveClock(){
   const el=qs("#liveClock"),date=qs("#liveDate"); if(!el)return;
-  const tick=()=>{const d=new Date();el.textContent=new Intl.DateTimeFormat("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(d);date.textContent=new Intl.DateTimeFormat("it-IT",{weekday:"long",day:"numeric",month:"long"}).format(d)};
+  const tick=()=>{const d=new Date();el.textContent=new Intl.DateTimeFormat("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(d);date.textContent=new Intl.DateTimeFormat("it-IT",{weekday:"long",day:"numeric",month:"long"}).format(d);updateLiveBets()};
   tick(); clearInterval(liveClock.timer); liveClock.timer=setInterval(tick,1000);
 }
 
@@ -81,9 +93,9 @@ function todayView(){
       <article class="time-card estimated-card"><span class="eyebrow">Fine stimata</span><strong>${esc(state.estimatedTime||"--:--")}</strong><p>La previsione di fine giornata</p></article>
       <article class="time-card actual-card"><span class="eyebrow">Wrap effettivo</span><strong>${esc(state.wrapTime||"--:--")}</strong><p>${state.wrapTime?"Orario ufficiale":"Ancora da confermare"}</p></article>
     </div>
-  </div><div class="section-head"><div><span class="eyebrow">Giornata ${state.day}</span><h1>Le bet di oggi</h1></div><span class="count-label">${withBets.length} ${withBets.length===1?"bet inserita":"bet inserite"}</span></div>
+  </div><div class="section-head"><div><span class="eyebrow">Giornata ${state.day}</span><h1>${state.dayClosed?"Risultati della giornata":"Le bet di oggi"}</h1></div><span class="count-label">${withBets.length} ${withBets.length===1?"bet inserita":"bet inserite"}</span></div>
   <div class="bet-list"><div class="bet-list-head"><span>Orario</span><span>Partecipante</span><span>Fascia di gioco</span><span>Stato</span></div>
-  <ol class="bets">${state.players.length?chronologicalPlayers(state.players).map(p=>{const s=status(p[3]);return `<li class="bet-row${p[3]?"":" no-bet"}"><time class="bet-time">${esc(p[3]||"—")}</time><div class="bet-person"><div class="avatar" aria-hidden="true">${esc(initials(p[0]))}</div><h3>${esc(p[0])}</h3></div><div class="bet-range">${p[3]?`<span class="mobile-range-label">Fascia </span>${bandLabel(p[3])}`:"Bet non inserita"}</div><span class="pill ${s[1]}">${s[0]}</span></li>`}).join(""):`<li class="empty">Aggiungi i partecipanti dalle impostazioni.</li>`}</ol></div>
+  <ol class="bets">${state.players.length?chronologicalPlayers(state.players).map(p=>{const s=status(p[3]),pts=pointsFor(p[3]);return `<li class="bet-row${p[3]?"":" no-bet"}${pts?" winner":""}${s[1]==="out"?" eliminated":""}" data-bet="${esc(p[3]||"")}"><time class="bet-time">${esc(p[3]||"—")}</time><div class="bet-person"><div class="avatar" aria-hidden="true">${esc(initials(p[0]))}</div><h3>${esc(p[0])} ${award(pts)}</h3></div><div class="bet-range">${p[3]?`<span class="mobile-range-label">Fascia </span>${bandLabel(p[3])}`:"Bet non inserita"}</div><span class="pill ${s[1]}">${s[0]}</span></li>`}).join(""):`<li class="empty">Aggiungi i partecipanti dalle impostazioni.</li>`}</ol></div>
   <p class="bet-footnote">Dall'orario più presto al più tardi. <span>3 punti per il minuto esatto · 1 punto per la fascia.</span></p></section>`;
 }
 
@@ -129,7 +141,7 @@ return `<article class="card trend-card"><div class="trend-head"><div><span clas
 }
 
 function historyView(){
- return `<section class="view"><div class="section-head"><div><span class="eyebrow">ARCHIVIO</span><h1>Storico giornate</h1></div><p>Apri una giornata per i dettagli</p></div><div class="history-list">${state.history.map(h=>`<article class="card history-row"><button class="history-summary" aria-expanded="false"><span class="history-day">Giorno ${h[0]}</span><span class="history-winner"><strong>${esc(h[1])}</strong><small>Bet vincente ${h[2]}</small></span><span class="history-score">+${h[4]} pt</span><span>⌄</span></button><div class="history-detail"><div class="mini"><span>Vincitore</span><strong>${esc(h[1])}</strong></div><div class="mini"><span>Bet</span><strong>${h[2]}</strong></div><div class="mini"><span>Fine stimata</span><strong>${h[5]||"—"}</strong></div><div class="mini"><span>Wrap ufficiale</span><strong>${h[3]}</strong></div></div></article>`).join("")}</div></section>`;
+ return `<section class="view"><div class="section-head"><div><span class="eyebrow">ARCHIVIO</span><h1>Storico giornate</h1></div><p>Apri una giornata per i dettagli</p></div><div class="history-list">${state.history.map(h=>`<article class="card history-row"><button class="history-summary" aria-expanded="false"><span class="history-day">Giorno ${h[0]}</span><span class="history-winner"><strong>${esc(h[1])} ${award(h[4])}</strong><small>Bet vincente ${h[2]}</small></span><span class="history-score">+${h[4]} pt</span><span>⌄</span></button><div class="history-detail"><div class="mini"><span>Vincitore</span><strong>${esc(h[1])} ${award(h[4])}</strong></div><div class="mini"><span>Bet</span><strong>${h[2]}</strong></div><div class="mini"><span>Fine stimata</span><strong>${h[5]||"—"}</strong></div><div class="mini"><span>Wrap ufficiale</span><strong>${h[3]}</strong></div></div></article>`).join("")}</div></section>`;
 }
 
 function render(){
@@ -164,11 +176,12 @@ async function mutateAndSave(mutator,success){const before=clone(state);mutator(
 qs("#openAdmin").addEventListener("click",()=>{if(!isAdmin){loginDialog.showModal();return}qs("#estimatedTimeInput").value=state.estimatedTime;qs("#wrapTimeInput").value=state.wrapTime;refreshPlayers();setAdminTab("bets");dialog.showModal()});
 qs("#closeAdmin").addEventListener("click",()=>dialog.close());
 document.querySelectorAll("[data-admin-tab]").forEach(button=>button.addEventListener("click",()=>setAdminTab(button.dataset.adminTab)));
-betsForm.addEventListener("submit",async e=>{e.preventDefault();const bets=[...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}));if(await mutateAndSave(()=>bets.forEach(item=>{if(state.players[item.index])state.players[item.index][3]=item.time}),"Tutte le bet sono state salvate"))dialog.close()});
-dayForm.addEventListener("submit",async e=>{e.preventDefault();const estimated=qs("#estimatedTimeInput").value;if(!estimated)return toast("Inserisci la fine stimata");if(await mutateAndSave(()=>state.estimatedTime=estimated,"Fine stimata salvata"))dialog.close()});
-qs("#addPlayer").addEventListener("click",async()=>{const input=qs("#newPlayerInput"),name=input.value.trim();if(!name)return toast("Inserisci un nome");if(state.players.some(p=>p[0].toLowerCase()===name.toLowerCase()))return toast("Partecipante già presente");if(await mutateAndSave(()=>state.players.push([name,0,0,null,0,0]),`${name} aggiunto`)){input.value="";refreshPlayers(state.players.length-1)}});
-qs("#removePlayer").addEventListener("click",async()=>{if(playerInput.value==="")return;const idx=+playerInput.value,name=state.players[idx][0];if(!confirm(`Rimuovere ${name}?`))return;if(await mutateAndSave(()=>state.players.splice(idx,1),`${name} rimosso`))refreshPlayers(Math.max(0,idx-1))});
+betsForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const bets=[...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}));if(await mutateAndSave(()=>bets.forEach(item=>{if(state.players[item.index])state.players[item.index][3]=item.time}),"Tutte le bet sono state salvate"))dialog.close()});
+dayForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const estimated=qs("#estimatedTimeInput").value;if(!estimated)return toast("Inserisci la fine stimata");if(await mutateAndSave(()=>state.estimatedTime=estimated,"Fine stimata salvata"))dialog.close()});
+qs("#addPlayer").addEventListener("click",async()=>{if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const input=qs("#newPlayerInput"),name=input.value.trim();if(!name)return toast("Inserisci un nome");if(state.players.some(p=>p[0].toLowerCase()===name.toLowerCase()))return toast("Partecipante già presente");if(await mutateAndSave(()=>state.players.push([name,0,0,null,0,0]),`${name} aggiunto`)){input.value="";refreshPlayers(state.players.length-1)}});
+qs("#removePlayer").addEventListener("click",async()=>{if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");if(playerInput.value==="")return;const idx=+playerInput.value,name=state.players[idx][0];if(!confirm(`Rimuovere ${name}?`))return;if(await mutateAndSave(()=>state.players.splice(idx,1),`${name} rimosso`))refreshPlayers(Math.max(0,idx-1))});
 async function closeDayAt(wrap,successMessage){
+  if(state.dayClosed)return toast("Giornata già chiusa: avvia il giorno successivo");
   const estimated=qs("#estimatedTimeInput").value;
   const bets=[...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}));
   if(!bets.some(item=>item.time))return toast("Inserisci almeno una bet");
@@ -189,12 +202,9 @@ async function closeDayAt(wrap,successMessage){
     });
     const best=Math.max(0,...scorers.map(s=>s[2])),winners=scorers.filter(s=>s[2]===best);
     state.history.unshift([state.day,winners.length?winners.map(w=>w[0]).join(" · "):"Nessun vincitore",winners.length?winners.map(w=>w[1]).join(" · "):"—",wrap,best,estimated,dayDetails]);
-    state.day+=1;
-    state.estimatedTime="";
-    state.wrapTime="";
-    state.players.forEach(p=>p[3]=null);
+    state.dayClosed=true;
   },successMessage);
-  if(saved){dialog.close();route="standings";location.hash=route;render()}
+  if(saved){dialog.close();route="today";location.hash=route;render()}
 }
 qs("#wrapNow").addEventListener("click",async()=>{
   const now=new Date();
@@ -203,7 +213,7 @@ qs("#wrapNow").addEventListener("click",async()=>{
   await closeDayAt(exact,`Wrap ${exact}: punti assegnati`);
 });
 qs("#finalizeDay").addEventListener("click",()=>closeDayAt(qs("#wrapTimeInput").value,"Punti assegnati e giornata chiusa"));
-qs("#advanceDay").addEventListener("click",async()=>{const nextDay=state.day+1;if(!confirm(`Passare al giorno ${nextDay} senza assegnare punti? Le bet e gli orari della giornata ${state.day} verranno cancellati.`))return;const saved=await mutateAndSave(()=>{state.day=nextDay;state.estimatedTime="";state.wrapTime="";state.players.forEach(p=>p[3]=null)},`Giorno ${nextDay} avviato`);if(saved){dialog.close();route="today";location.hash=route;render()}});
+qs("#advanceDay").addEventListener("click",async()=>{const nextDay=state.day+1;if(!confirm(state.dayClosed?`Avviare il giorno ${nextDay}? I risultati del giorno ${state.day} resteranno nello storico.`:`Passare al giorno ${nextDay} senza assegnare punti? Le bet e gli orari della giornata ${state.day} verranno cancellati.`))return;const saved=await mutateAndSave(()=>{state.day=nextDay;state.dayClosed=false;state.estimatedTime="";state.wrapTime="";state.players.forEach(p=>p[3]=null)},`Giorno ${nextDay} avviato`);if(saved){dialog.close();route="today";location.hash=route;render()}});
 qs("#resetDemo").addEventListener("click",async()=>{if(!confirm("Azzerare partecipanti, classifica, precisione e storico?"))return;if(await mutateAndSave(()=>state=clone(original),"TotoWrap azzerato: si riparte dal giorno 1"))dialog.close()});
 loginForm.addEventListener("submit",async e=>{e.preventDefault();const button=loginForm.querySelector("button[type=submit]");button.disabled=true;button.textContent="Accesso…";try{const credential=await signInWithEmailAndPassword(auth,qs("#loginEmail").value.trim(),qs("#loginPassword").value);if(credential.user.uid!==ADMIN_UID){await signOut(auth);throw new Error("Utente non autorizzato")}qs("#loginPassword").value="";loginDialog.close();qs("#estimatedTimeInput").value=state.estimatedTime;qs("#wrapTimeInput").value=state.wrapTime;refreshPlayers();setAdminTab("bets");dialog.showModal();toast("Accesso amministratore effettuato")}catch(error){console.error(error);toast("Email o password non corretti")}finally{button.disabled=false;button.textContent="Accedi"}});
 qs("#closeLogin").addEventListener("click",()=>loginDialog.close());
