@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f7fd">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="description" content="TotoWrap: indovina l'orario di fine giornata, scala la classifica e confronta la precisione.">
+  <title>TotoWrap</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="gu3-icon-32.png?v=21">
+  <link rel="apple-touch-icon" sizes="180x180" href="gu3-icon-180.png?v=21">
+  <link rel="manifest" href="manifest.webmanifest?v=21">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="TotoWrap">
+  <link rel="stylesheet" href="style.css?v=20260928-26">
+  <style>
+    #loadingScreen{position:fixed;inset:0;z-index:100;background:#f4f7fd;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:30px;overflow-y:auto;font-family:system-ui,sans-serif;perspective:900px}
+    #loadingScreen[hidden]{display:none!important}
+    #loadingScreen .loading-logo{width:min(560px,85vw);height:clamp(130px,24vw,200px);position:relative;perspective:900px;flex-shrink:0}
+    #loadingScreen .logo-rotor{position:absolute;inset:0;transform-style:preserve-3d;animation:loading-logo-turn 6s ease-in-out infinite}
+    #loadingScreen .logo-face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
+    #loadingScreen .logo-back{transform:rotateY(180deg)}
+    #loadingScreen .logo-face img{width:100%;height:100%;object-fit:contain;display:block}
+    #loadingScreen .logo-back img{width:auto;height:170%;max-width:none;flex-shrink:0}
+    #loadingScreen .loading-points{display:flex;flex-direction:column;gap:12px;width:min(310px,100%);margin:0;padding:0;list-style:none;color:#26334c;font-size:1.125rem;text-align:left}
+    #loadingScreen .loading-points li{display:flex;justify-content:space-between;gap:24px}
+    #loadingScreen .loading-points strong{color:#193eb9;font-weight:750}
+    #loadingScreen .loading-points li:last-child strong{color:#ef0b19}
+    #loadingScreen #loadingQuote{position:static!important;margin:0;max-width:560px;width:100%;color:#d64557!important;font-weight:800!important;font-size:1.125rem;text-align:center;line-height:1.5}
+    #loadingScreen #loadingQuote.is-flipping{animation:loading-quote-turn .9s ease-in-out both}
+    #connectionError{position:fixed;inset:0;z-index:110;background:#f4f7fd;padding:32px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:20px;text-align:center;color:#26334c;font-family:system-ui,sans-serif}
+    #connectionError[hidden]{display:none!important}
+    #connectionError button{border:0;border-radius:18px;padding:12px 24px;background:#345dd0;color:white;cursor:pointer}
+    @keyframes loading-logo-turn{0%,18%{transform:rotateY(0)}38%,68%{transform:rotateY(180deg)}88%,100%{transform:rotateY(360deg)}}
+    @keyframes loading-quote-turn{0%{transform:rotateY(0);opacity:1}49%{transform:rotateY(90deg);opacity:0}50%{transform:rotateY(-90deg);opacity:0}100%{transform:rotateY(0);opacity:1}}
+    @media(prefers-reduced-motion:reduce){#loadingScreen .logo-rotor,#loadingScreen #loadingQuote.is-flipping{animation:none}#loadingScreen .logo-back{display:none}}
+    @media(max-height:450px){#loadingScreen{justify-content:flex-start;gap:12px}#loadingScreen .loading-logo{height:100px}}
+  </style>
+</head>
+<body>
+<div id="loadingScreen" role="status"><div class="logo-flip loading-logo" role="img" aria-label="TotoWrap e GU3"><div class="logo-rotor" aria-hidden="true"><div class="logo-face logo-front"><img src="totowrap-logo.png" alt=""></div><div class="logo-face logo-back"><img src="gu3-logo.png" alt=""></div></div></div><ul class="loading-points" aria-label="Assegnazione punteggi"><li>Orario esatto <strong>3pt</strong></li><li>Fascia oraria <strong>1pt</strong></li></ul><p class="loading-quote" id="loadingQuote"></p></div>
+  <div id="connectionError" role="alert" hidden><p>Impossibile caricare i dati di TotoWrap. Controlla la connessione e le regole Firebase, poi riprova.</p><button type="button" onclick="location.reload()">Riprova</button></div>
+  <script>
+    (()=>{
+      const phrases=[
+        "COMPLIMENTI COLETTE PER LA VITTORIA DEL TOTOWRAP",
+        "UNA SETTIMANA DI SCOMMESSE CI ASPETTA, MA IN TEORIA SIAMO QUI PER LAVORARE",
+        "LA LUDOPATIA È UN PROBLEMA SOLO SE PERDI",
+        "LA TUA STRATEGIA È COSÌ CONFUSA CHE SEI DIVENTATO UN BAMBOCCIONE PURE TU",
+        "IO VENGO A LAVORO SOLO PER IL TOTOWRAP",
+        "99% DEI BAMBOCCIONI SMETTE DI BETTARE PRIMA DELLA VITTORIA - CONTINUA A GAMBLARE",
+        "AMO L'ODORE DEL TOTOWRAP LA MATTINA",
+        "VINCERAI IL 100% DELLE BET CHE NON GIOCHI",
+        "SCOMMETTI RESPONSABILMENTE, A MENO CHE TU NON SIA CARLO"
+      ];
+      const screen=document.getElementById("loadingScreen"),quote=document.getElementById("loadingQuote"),error=document.getElementById("connectionError");
+      const phraseDuration=2000,minimumLoadingDuration=6000,started=Date.now();
+      let last=-1,flipMidpoint,flipEnd,readyTimeout,connectionTimer,finished=false;
+      try{const saved=window.localStorage.getItem("totowrap-last-phrase");if(saved!==null){const number=Number(saved);if(Number.isInteger(number)&&number>=0&&number<phrases.length)last=number}}catch{}
+      const nextPhrase=()=>{
+        let choice=Math.floor(Math.random()*(phrases.length-(phrases.length>1&&last>=0?1:0)));
+        if(phrases.length>1&&last>=0&&choice>=last)choice++;
+        last=choice;
+        try{window.localStorage.setItem("totowrap-last-phrase",String(last))}catch{}
+        return phrases[last];
+      };
+      quote.textContent=nextPhrase();
+      const reducedMotion=window.matchMedia("(prefers-reduced-motion: reduce)");
+      const phraseTimer=setInterval(()=>{
+        if(screen.hidden)return;
+        const next=nextPhrase();
+        if(reducedMotion.matches){quote.textContent=next;return}
+        quote.classList.add("is-flipping");
+        flipMidpoint=setTimeout(()=>{quote.textContent=next},450);
+        flipEnd=setTimeout(()=>{quote.classList.remove("is-flipping")},900);
+      },phraseDuration);
+      const stopLoading=()=>{finished=true;clearInterval(phraseTimer);clearTimeout(flipMidpoint);clearTimeout(flipEnd);clearTimeout(readyTimeout);clearTimeout(connectionTimer);screen.hidden=true};
+      window.totowrapReady=()=>{if(finished||readyTimeout)return;clearTimeout(connectionTimer);readyTimeout=setTimeout(()=>{stopLoading();error.hidden=true},Math.max(0,minimumLoadingDuration-(Date.now()-started)))};
+      window.totowrapLoadFailed=()=>{if(finished)return;stopLoading();error.hidden=false};
+      connectionTimer=setTimeout(window.totowrapLoadFailed,25000);
+    })();
+  </script>
+  <div class="shell">
+    <header class="topbar">
+      <button class="brand" data-route="today" aria-label="Vai a Oggi">
+        <span class="logo-flip header-logo" role="img" aria-label="TotoWrap e GU3"><span class="logo-rotor" aria-hidden="true"><span class="logo-face logo-front"><img src="totowrap-logo.png" alt=""></span><span class="logo-face logo-back"><img src="gu3-logo.png" alt=""></span></span></span>
+      </button>
+      <div class="day-chip"><span>Day</span><strong id="dayNumber">1</strong></div>
+      <button class="icon-btn" id="openAdmin" aria-label="Apri gestione" title="Gestione">⚙</button>
+    </header>
+
+    <nav class="nav" aria-label="Navigazione principale">
+      <button class="active" data-route="today"><span>◉</span>Oggi</button>
+      <button data-route="tables"><span>◆</span>Tabelle</button>
+      <button data-route="history"><span>↺</span>Storico</button>
+    </nav>
+
+    <main id="app" tabindex="-1"></main>
+  </div>
+
+  <dialog id="adminDialog">
+    <div class="dialog-card">
+      <div class="dialog-head">
+        <div><span class="eyebrow">AREA AMMINISTRATORE</span><h2>Impostazioni TotoWrap</h2></div>
+        <button type="button" class="icon-btn" id="closeAdmin" aria-label="Chiudi">×</button>
+      </div>
+      <div class="admin-session"><span>Accesso amministratore attivo</span><button type="button" id="signOutBtn">Esci</button></div>
+      <div class="admin-tabs" role="tablist" aria-label="Sezioni amministratore">
+        <button type="button" class="active" data-admin-tab="bets" role="tab">Partecipanti e bet</button>
+        <button type="button" data-admin-tab="day" role="tab">Wrap e giornata</button>
+      </div>
+
+      <section class="admin-page active" data-admin-page="bets">
+        <form id="betsForm">
+          <div class="bulk-bets-head"><span>Bet dei partecipanti</span><small>Inseriscile tutte e salva una volta</small></div>
+          <div class="bulk-bets" id="bulkBets"></div>
+          <button type="submit" class="primary save-page" id="saveBets">Salva bet private</button>
+          <button type="button" class="primary save-page" id="publishBets">Pubblica bet</button>
+          <p class="field-note">Prima della pubblicazione le bet salvate sono leggibili soltanto dall'amministratore. La pubblicazione è manuale, al ready to shoot.</p>
+        </form>
+        <div class="player-tools">
+          <label>Nuovo partecipante
+            <input id="newPlayerInput" type="text" maxlength="30" placeholder="Nome">
+          </label>
+          <button type="button" class="secondary" id="addPlayer">Aggiungi</button>
+        </div>
+        <div class="remove-player">
+          <select id="playerInput" aria-label="Partecipante da rimuovere"></select>
+          <button type="button" class="danger" id="removePlayer">Rimuovi selezionato</button>
+        </div>
+      </section>
+
+      <section class="admin-page" data-admin-page="day">
+        <form id="dayForm">
+          <label>Bet closing at · inizio riprese dal callsheet<input id="betClosingTimeInput" type="time" step="60"></label>
+          <div class="time-inputs">
+            <label>Fine stimata
+              <input id="estimatedTimeInput" type="time" step="1">
+            </label>
+            <label>Wrap effettivo manuale
+              <input id="wrapTimeInput" type="time" step="1">
+            </label>
+          </div>
+          <p class="field-note">La stima si salva a inizio giornata. Il wrap manuale è soltanto un'alternativa al pulsante automatico.</p>
+          <button type="submit" class="primary save-page">Salva orari della giornata</button>
+        </form>
+        <button type="button" class="wrap-now" id="wrapNow">WRAP ORA · chiudi e assegna i punti</button>
+        <button type="button" class="finalize" id="finalizeDay">Chiudi usando il wrap inserito manualmente</button>
+        <button type="button" class="advance-day" id="advanceDay">Avvia il giorno successivo</button>
+        <button type="button" class="reset-all" id="resetDemo">Azzera completamente TotoWrap</button>
+      </section>
+      <p class="helper">Ogni modifica viene salvata nel database condiviso e appare in tempo reale su tutti i dispositivi.</p>
+    </div>
+  </dialog>
+
+  <dialog id="loginDialog">
+    <form class="dialog-card" id="loginForm">
+      <div class="dialog-head">
+        <div><span class="eyebrow">AREA RISERVATA</span><h2>Accesso amministratore</h2></div>
+        <button type="button" class="icon-btn" id="closeLogin" aria-label="Chiudi">×</button>
+      </div>
+      <label>Email
+        <input id="loginEmail" type="email" autocomplete="username" required>
+      </label>
+      <label>Password
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="primary login-submit">Accedi</button>
+      <p class="helper">Le credenziali vengono gestite direttamente da Firebase e non sono salvate nel sito.</p>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="app.js?v=20260928-26" onerror="window.totowrapLoadFailed()"></script>
+</body>
+</html>
