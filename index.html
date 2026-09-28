@@ -14,9 +14,9 @@
   <link rel="manifest" href="manifest.webmanifest?v=21">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="TotoWrap">
-  <link rel="stylesheet" href="style.css?v=20260916-23">
+  <link rel="stylesheet" href="style.css?v=20260928-26">
   <style>
-    #loadingScreen{position:fixed;inset:0;z-index:100;background:#f4f7fd;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:30px;overflow-y:auto;font-family:system-ui,sans-serif}
+    #loadingScreen{position:fixed;inset:0;z-index:100;background:#f4f7fd;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:30px;overflow-y:auto;font-family:system-ui,sans-serif;perspective:900px}
     #loadingScreen[hidden]{display:none!important}
     #loadingScreen .loading-logo{width:min(560px,85vw);height:clamp(130px,24vw,200px);position:relative;perspective:900px;flex-shrink:0}
     #loadingScreen .logo-rotor{position:absolute;inset:0;transform-style:preserve-3d;animation:loading-logo-turn 6s ease-in-out infinite}
@@ -29,16 +29,18 @@
     #loadingScreen .loading-points strong{color:#193eb9;font-weight:750}
     #loadingScreen .loading-points li:last-child strong{color:#ef0b19}
     #loadingScreen #loadingQuote{position:static!important;margin:0;max-width:560px;width:100%;color:#d64557!important;font-weight:800!important;font-size:1.125rem;text-align:center;line-height:1.5}
+    #loadingScreen #loadingQuote.is-flipping{animation:loading-quote-turn .9s ease-in-out both}
     #connectionError{position:fixed;inset:0;z-index:110;background:#f4f7fd;padding:32px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:20px;text-align:center;color:#26334c;font-family:system-ui,sans-serif}
     #connectionError[hidden]{display:none!important}
     #connectionError button{border:0;border-radius:18px;padding:12px 24px;background:#345dd0;color:white;cursor:pointer}
     @keyframes loading-logo-turn{0%,18%{transform:rotateY(0)}38%,68%{transform:rotateY(180deg)}88%,100%{transform:rotateY(360deg)}}
-    @media(prefers-reduced-motion:reduce){#loadingScreen .logo-rotor{animation:none}#loadingScreen .logo-back{display:none}}
+    @keyframes loading-quote-turn{0%{transform:rotateY(0);opacity:1}49%{transform:rotateY(90deg);opacity:0}50%{transform:rotateY(-90deg);opacity:0}100%{transform:rotateY(0);opacity:1}}
+    @media(prefers-reduced-motion:reduce){#loadingScreen .logo-rotor,#loadingScreen #loadingQuote.is-flipping{animation:none}#loadingScreen .logo-back{display:none}}
     @media(max-height:450px){#loadingScreen{justify-content:flex-start;gap:12px}#loadingScreen .loading-logo{height:100px}}
   </style>
 </head>
 <body>
-<div id="loadingScreen" role="status"><div class="logo-flip loading-logo" role="img" aria-label="TotoWrap e GU3"><div class="logo-rotor" aria-hidden="true"><div class="logo-face logo-front"><img src="totowrap-logo.png" alt=""></div><div class="logo-face logo-back"><img src="gu3-logo.png" alt=""></div></div></div><ul class="loading-points" aria-label="Assegnazione punteggi"><li>Orario esatto <strong>3pt</strong></li><li>Fascia oraria <strong>1pt</strong></li></ul><p class="loading-quote" id="loadingQuote">COMPLIMENTI COLETTE PER LA VITTORIA DEL TOTOWRAP</p></div>
+<div id="loadingScreen" role="status"><div class="logo-flip loading-logo" role="img" aria-label="TotoWrap e GU3"><div class="logo-rotor" aria-hidden="true"><div class="logo-face logo-front"><img src="totowrap-logo.png" alt=""></div><div class="logo-face logo-back"><img src="gu3-logo.png" alt=""></div></div></div><ul class="loading-points" aria-label="Assegnazione punteggi"><li>Orario esatto <strong>3pt</strong></li><li>Fascia oraria <strong>1pt</strong></li></ul><p class="loading-quote" id="loadingQuote"></p></div>
   <div id="connectionError" role="alert" hidden><p>Impossibile caricare i dati di TotoWrap. Controlla la connessione e le regole Firebase, poi riprova.</p><button type="button" onclick="location.reload()">Riprova</button></div>
   <script>
     (()=>{
@@ -54,11 +56,29 @@
         "SCOMMETTI RESPONSABILMENTE, A MENO CHE TU NON SIA CARLO"
       ];
       const screen=document.getElementById("loadingScreen"),quote=document.getElementById("loadingQuote"),error=document.getElementById("connectionError");
-      let index=0;
-      const phraseTimer=setInterval(()=>{if(!screen.hidden){index=(index+1)%phrases.length;if(quote.textContent!==phrases[index])quote.textContent=phrases[index]}},1000);
-      let connectionTimer;
-      window.totowrapReady=()=>{clearInterval(phraseTimer);clearTimeout(connectionTimer);screen.hidden=true;error.hidden=true};
-      window.totowrapLoadFailed=()=>{clearInterval(phraseTimer);clearTimeout(connectionTimer);screen.hidden=true;error.hidden=false};
+      const phraseDuration=2000,minimumLoadingDuration=6000,started=Date.now();
+      let last=-1,flipMidpoint,flipEnd,readyTimeout,connectionTimer,finished=false;
+      try{const saved=window.localStorage.getItem("totowrap-last-phrase");if(saved!==null){const number=Number(saved);if(Number.isInteger(number)&&number>=0&&number<phrases.length)last=number}}catch{}
+      const nextPhrase=()=>{
+        let choice=Math.floor(Math.random()*(phrases.length-(phrases.length>1&&last>=0?1:0)));
+        if(phrases.length>1&&last>=0&&choice>=last)choice++;
+        last=choice;
+        try{window.localStorage.setItem("totowrap-last-phrase",String(last))}catch{}
+        return phrases[last];
+      };
+      quote.textContent=nextPhrase();
+      const reducedMotion=window.matchMedia("(prefers-reduced-motion: reduce)");
+      const phraseTimer=setInterval(()=>{
+        if(screen.hidden)return;
+        const next=nextPhrase();
+        if(reducedMotion.matches){quote.textContent=next;return}
+        quote.classList.add("is-flipping");
+        flipMidpoint=setTimeout(()=>{quote.textContent=next},450);
+        flipEnd=setTimeout(()=>{quote.classList.remove("is-flipping")},900);
+      },phraseDuration);
+      const stopLoading=()=>{finished=true;clearInterval(phraseTimer);clearTimeout(flipMidpoint);clearTimeout(flipEnd);clearTimeout(readyTimeout);clearTimeout(connectionTimer);screen.hidden=true};
+      window.totowrapReady=()=>{if(finished||readyTimeout)return;clearTimeout(connectionTimer);readyTimeout=setTimeout(()=>{stopLoading();error.hidden=true},Math.max(0,minimumLoadingDuration-(Date.now()-started)))};
+      window.totowrapLoadFailed=()=>{if(finished)return;stopLoading();error.hidden=false};
       connectionTimer=setTimeout(window.totowrapLoadFailed,25000);
     })();
   </script>
@@ -153,6 +173,6 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20260916-23" onerror="window.totowrapLoadFailed()"></script>
+  <script type="module" src="app.js?v=20260928-26" onerror="window.totowrapLoadFailed()"></script>
 </body>
 </html>
