@@ -24,6 +24,7 @@ const original = {
   dayClosed: false,
   betsPublished: false,
   betClosingTime: "",
+  betClosingDate: "",
   players: [],
   history: []
 };
@@ -87,14 +88,31 @@ const persist = async () => {
   await setDoc(STATE_REF,{payload:JSON.stringify(publicState),updatedAt:serverTimestamp()});
 };
 
+const romeParts = date => Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Rome",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).formatToParts(date).filter(part=>part.type!=="literal").map(part=>[part.type,Number(part.value)]));
+const romeDate = date => {const p=romeParts(date);return `${p.year}-${String(p.month).padStart(2,"0")}-${String(p.day).padStart(2,"0")}`};
 function liveClock(){
-  const el=qs("#liveClock"),date=qs("#liveDate"); if(!el)return;
-  const tick=()=>{const d=new Date();el.textContent=new Intl.DateTimeFormat("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(d);date.textContent=new Intl.DateTimeFormat("it-IT",{weekday:"long",day:"numeric",month:"long"}).format(d);updateLiveBets()};
-  tick(); clearInterval(liveClock.timer); liveClock.timer=setInterval(tick,1000);
+  const el=qs("#liveClock"),date=qs("#liveDate"),closing=qs("#closingTime"),countdown=qs("#countdownBlock"),remainingEl=qs("#countdownClock");
+  clearInterval(liveClock.timer);
+  if(!el&&!closing)return;
+  const tick=()=>{
+    const now=new Date(),p=romeParts(now);
+    if(closing){
+      const target=state.betClosingTime,day=state.betClosingDate||romeDate(now);
+      const [hour,minute]=target.split(":").map(Number);
+      const left=target?Math.floor((Date.UTC(...day.split("-").map(Number).map((v,i)=>i===1?v-1:v),hour,minute)-Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute,p.second))/1000):null;
+      const stopped=left!==null&&left<=0;
+      closing.textContent=stopped?"STOP":target||"--:--";
+      countdown.hidden=left===null;
+      if(left!==null){const remaining=Math.max(0,left),h=Math.floor(remaining/3600),m=Math.floor(remaining%3600/60),s=remaining%60;remainingEl.textContent=[h,m,s].map(v=>String(v).padStart(2,"0")).join(":")}
+    }
+    if(el){el.textContent=[p.hour,p.minute,p.second].map(v=>String(v).padStart(2,"0")).join(":");date.textContent=new Intl.DateTimeFormat("it-IT",{timeZone:"Europe/Rome",weekday:"long",day:"numeric",month:"long"}).format(now)}
+    updateLiveBets();
+  };
+  tick();liveClock.timer=setInterval(tick,250);
 }
 
 function todayView(){
-  if(!state.betsPublished)return `<section class="view"><div class="hero-grid"><article class="clock-card"><span class="eyebrow">L'orologio di oggi</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span></article><article class="bet-closing"><span class="eyebrow">Bet closing at</span><strong>${esc(state.betClosingTime||"--:--")}</strong><p>Ready to shoot · Giorno ${state.day}</p></article></div><div class="card awaiting-bets"><h1>Le bet sono ancora riservate</h1><p>Compariranno qui quando l'amministratore cliccherà “Pubblica bet”.</p></div></section>`;
+  if(!state.betsPublished)return `<section class="view"><div class="closing-layout"><article class="bet-closing"><span class="eyebrow">Bet closing at</span><strong id="closingTime">${esc(state.betClosingTime||"--:--")}</strong><div id="countdownBlock" class="closing-countdown" hidden><span>Tempo rimasto</span><strong id="countdownClock" role="timer">--:--:--</strong></div><p>Ready to shoot · Giorno ${state.day}</p></article></div><div class="card awaiting-bets"><h1>Le bet sono ancora riservate</h1><p>Compariranno qui quando l'amministratore cliccherà “Pubblica bet”.</p></div></section>`;
   const withBets=state.players.filter(p=>p[3]);
   return `<section class="view"><div class="hero-grid">
     <article class="clock-card"><span class="eyebrow">L'orologio di oggi</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span></article>
@@ -206,7 +224,7 @@ function render(){
   qs("#dayNumber").textContent=state.day;
   document.querySelectorAll("[data-route]").forEach(b=>b.classList.toggle("active",b.dataset.route===route));
   app.innerHTML=({today:todayView,tables:tablesView,history:historyView})[route]();
-  if(route==="today")liveClock();
+  if(route==="today")liveClock();else clearInterval(liveClock.timer);
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
@@ -261,7 +279,7 @@ qs("#openAdmin").addEventListener("click",()=>{if(!isAdmin){loginDialog.showModa
 qs("#closeAdmin").addEventListener("click",()=>dialog.close());
 document.querySelectorAll("[data-admin-tab]").forEach(button=>button.addEventListener("click",()=>setAdminTab(button.dataset.adminTab)));
 betsForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");if(!state.betsPublished){if(await savePrivateBets()){toast("Bet salvate in privato");dialog.close()}return}const bets=[...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}));if(await mutateAndSave(()=>bets.forEach(item=>{if(state.players[item.index])state.players[item.index][3]=item.time}),"Tutte le bet sono state salvate"))dialog.close()});
-dayForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const estimated=qs("#estimatedTimeInput").value,closing=qs("#betClosingTimeInput").value;if(await mutateAndSave(()=>{state.estimatedTime=estimated;state.betClosingTime=closing},"Orari della giornata salvati"))dialog.close()});
+dayForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const estimated=qs("#estimatedTimeInput").value,closing=qs("#betClosingTimeInput").value;if(await mutateAndSave(()=>{state.estimatedTime=estimated;state.betClosingDate=closing?(closing===state.betClosingTime&&state.betClosingDate||romeDate(new Date())):"";state.betClosingTime=closing},"Orari della giornata salvati"))dialog.close()});
 qs("#addPlayer").addEventListener("click",async()=>{if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const input=qs("#newPlayerInput"),name=input.value.trim();if(!name)return toast("Inserisci un nome");if(state.players.some(p=>p[0].toLowerCase()===name.toLowerCase()))return toast("Partecipante già presente");if(await mutateAndSave(()=>state.players.push([name,0,0,null,0,0]),`${name} aggiunto`)){input.value="";refreshPlayers(state.players.length-1)}});
 qs("#removePlayer").addEventListener("click",async()=>{if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");if(playerInput.value==="")return;const idx=+playerInput.value,name=state.players[idx][0];if(!confirm(`Rimuovere ${name}?`))return;if(await mutateAndSave(()=>state.players.splice(idx,1),`${name} rimosso`))refreshPlayers(Math.max(0,idx-1))});
 async function closeDayAt(wrap,successMessage){
@@ -298,7 +316,7 @@ qs("#wrapNow").addEventListener("click",async()=>{
   await closeDayAt(exact,`Wrap ${exact}: punti assegnati`);
 });
 qs("#finalizeDay").addEventListener("click",()=>closeDayAt(qs("#wrapTimeInput").value,"Punti assegnati e giornata chiusa"));
-qs("#advanceDay").addEventListener("click",async()=>{const nextDay=state.day+1;if(!confirm(state.dayClosed?`Avviare il giorno ${nextDay}? I risultati del giorno ${state.day} resteranno nello storico.`:`Passare al giorno ${nextDay} senza assegnare punti? Le bet e gli orari della giornata ${state.day} verranno cancellati.`))return;const saved=await mutateAndSave(()=>{state.day=nextDay;state.betsPublished=false;state.betClosingTime="";privateBets={};draftDay=null;state.dayClosed=false;state.estimatedTime="";state.wrapTime="";state.players.forEach(p=>p[3]=null)},`Giorno ${nextDay} avviato`);if(saved){dialog.close();route="today";location.hash=route;render()}});
+qs("#advanceDay").addEventListener("click",async()=>{const nextDay=state.day+1;if(!confirm(state.dayClosed?`Avviare il giorno ${nextDay}? I risultati del giorno ${state.day} resteranno nello storico.`:`Passare al giorno ${nextDay} senza assegnare punti? Le bet e gli orari della giornata ${state.day} verranno cancellati.`))return;const saved=await mutateAndSave(()=>{state.day=nextDay;state.betsPublished=false;state.betClosingTime="";state.betClosingDate="";privateBets={};draftDay=null;state.dayClosed=false;state.estimatedTime="";state.wrapTime="";state.players.forEach(p=>p[3]=null)},`Giorno ${nextDay} avviato`);if(saved){dialog.close();route="today";location.hash=route;render()}});
 qs("#resetDemo").addEventListener("click",async()=>{if(!confirm("Azzerare partecipanti, classifica, precisione e storico?"))return;try{await deleteDoc(DRAFT_REF)}catch(error){return toast("Reset non riuscito: controlla le regole Firebase")}privateBets={};draftDay=null;if(await mutateAndSave(()=>state=clone(original),"TotoWrap azzerato: si riparte dal giorno 1"))dialog.close()});
 loginForm.addEventListener("submit",async e=>{e.preventDefault();const button=loginForm.querySelector("button[type=submit]");button.disabled=true;button.textContent="Accesso…";try{const credential=await signInWithEmailAndPassword(auth,qs("#loginEmail").value.trim(),qs("#loginPassword").value);if(credential.user.uid!==ADMIN_UID){await signOut(auth);throw new Error("Utente non autorizzato")}qs("#loginPassword").value="";loginDialog.close();await openAdminSettings();toast("Accesso amministratore effettuato")}catch(error){console.error(error);toast("Email o password non corretti")}finally{button.disabled=false;button.textContent="Accedi"}});
 qs("#closeLogin").addEventListener("click",()=>loginDialog.close());
