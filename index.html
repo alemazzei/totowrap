@@ -38,11 +38,21 @@
   </style>
 </head>
 <body>
-<div id="loadingScreen" role="status"><div class="logo-flip loading-logo" role="img" aria-label="TotoWrap e GU3"><div class="logo-rotor" aria-hidden="true"><div class="logo-face logo-front"><img src="totowrap-logo.png" alt=""></div><div class="logo-face logo-back"><img src="gu3-logo.png" alt=""></div></div></div><ul class="loading-points" aria-label="Assegnazione punteggi"><li>Orario esatto <strong>3pt</strong></li><li>Fascia oraria <strong>1pt</strong></li></ul><p class="loading-quote" id="loadingQuote">Complimenti Colette per la vittoria del TotoWrap</p></div>
+<div id="loadingScreen" role="status"><div class="logo-flip loading-logo" role="img" aria-label="TotoWrap e GU3"><div class="logo-rotor" aria-hidden="true"><div class="logo-face logo-front"><img src="totowrap-logo.png" alt=""></div><div class="logo-face logo-back"><img src="gu3-logo.png" alt=""></div></div></div><ul class="loading-points" aria-label="Assegnazione punteggi"><li>Orario esatto <strong>3pt</strong></li><li>Fascia oraria <strong>1pt</strong></li></ul><p class="loading-quote" id="loadingQuote">COMPLIMENTI COLETTE PER LA VITTORIA DEL TOTOWRAP</p></div>
   <div id="connectionError" role="alert" hidden><p>Impossibile caricare i dati di TotoWrap. Controlla la connessione e le regole Firebase, poi riprova.</p><button type="button" onclick="location.reload()">Riprova</button></div>
   <script>
     (()=>{
-      const phrases=["Complimenti Colette per la vittoria del TotoWrap"];
+      const phrases=[
+        "COMPLIMENTI COLETTE PER LA VITTORIA DEL TOTOWRAP",
+        "UNA SETTIMANA DI SCOMMESSE CI ASPETTA, MA IN TEORIA SIAMO QUI PER LAVORARE",
+        "LA LUDOPATIA È UN PROBLEMA SOLO SE PERDI",
+        "LA TUA STRATEGIA È COSÌ CONFUSA CHE SEI DIVENTATO UN BAMBOCCIONE PURE TU",
+        "IO VENGO A LAVORO SOLO PER IL TOTOWRAP",
+        "99% DEI BAMBOCCIONI SMETTE DI BETTARE PRIMA DELLA VITTORIA - CONTINUA A GAMBLARE",
+        "AMO L'ODORE DEL TOTOWRAP LA MATTINA",
+        "VINCERAI IL 100% DELLE BET CHE NON GIOCHI",
+        "SCOMMETTI RESPONSABILMENTE, A MENO CHE TU NON SIA CARLO"
+      ];
       const screen=document.getElementById("loadingScreen"),quote=document.getElementById("loadingQuote"),error=document.getElementById("connectionError");
       let index=0;
       const phraseTimer=setInterval(()=>{if(!screen.hidden){index=(index+1)%phrases.length;if(quote.textContent!==phrases[index])quote.textContent=phrases[index]}},1000);
