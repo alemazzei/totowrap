@@ -69,7 +69,8 @@ const bandLabel = t => {const band=bandFor(t);return band?`${clock(band.lower)}�
 const award = points => points===3?'<span class="award" role="img" aria-label="Vittoria per minuto esatto">🏆</span>':points===1?'<span class="award" role="img" aria-label="Vittoria per fascia oraria">🥇</span>':"";
 function expiredBet(t,now=new Date()){
   const band=bandFor(t);if(!band)return false;
-  let seconds=now.getHours()*3600+now.getMinutes()*60+now.getSeconds();
+  const p=romeParts(now);
+  let seconds=p.hour*3600+p.minute*60+p.second;
   while(seconds<band.center-DAY_SEC/2)seconds+=DAY_SEC;
   while(seconds>band.center+DAY_SEC/2)seconds-=DAY_SEC;
   return seconds>band.upper;
@@ -90,8 +91,24 @@ const persist = async () => {
 
 const romeParts = date => Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Rome",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).formatToParts(date).filter(part=>part.type!=="literal").map(part=>[part.type,Number(part.value)]));
 const romeDate = date => {const p=romeParts(date);return `${p.year}-${String(p.month).padStart(2,"0")}-${String(p.day).padStart(2,"0")}`};
+function nextElimination(p){
+  if(state.dayClosed||state.wrapTime)return null;
+  const bands=bettingBands(),now=p.hour*3600+p.minute*60+p.second;
+  let next=null;
+  for(const player of state.players){
+    const band=bands.get(player[3]);if(!band)continue;
+    let adjusted=now;
+    while(adjusted<band.center-DAY_SEC/2)adjusted+=DAY_SEC;
+    while(adjusted>band.center+DAY_SEC/2)adjusted-=DAY_SEC;
+    const remaining=band.upper+1-adjusted;
+    if(remaining<=0)continue;
+    if(!next||remaining<next.remaining)next={remaining,names:[player[0]]};
+    else if(remaining===next.remaining)next.names.push(player[0]);
+  }
+  return next;
+}
 function liveClock(){
-  const el=qs("#liveClock"),date=qs("#liveDate"),closing=qs("#closingTime"),countdown=qs("#countdownBlock"),remainingEl=qs("#countdownClock");
+  const el=qs("#liveClock"),date=qs("#liveDate"),closing=qs("#closingTime"),countdown=qs("#countdownBlock"),remainingEl=qs("#countdownClock"),elimination=qs("#nextElimination"),eliminationName=qs("#nextEliminationName"),eliminationTimer=qs("#nextEliminationTimer");
   clearInterval(liveClock.timer);
   if(!el&&!closing)return;
   const tick=()=>{
@@ -106,6 +123,15 @@ function liveClock(){
       if(left!==null){const remaining=Math.max(0,left),h=Math.floor(remaining/3600),m=Math.floor(remaining%3600/60),s=remaining%60;remainingEl.textContent=[h,m,s].map(v=>String(v).padStart(2,"0")).join(":")}
     }
     if(el){el.textContent=[p.hour,p.minute,p.second].map(v=>String(v).padStart(2,"0")).join(":");date.textContent=new Intl.DateTimeFormat("it-IT",{timeZone:"Europe/Rome",weekday:"long",day:"numeric",month:"long"}).format(now)}
+    if(elimination){
+      const next=nextElimination(p);
+      elimination.hidden=!next;
+      if(next){
+        eliminationName.textContent=next.names.join(" e ");
+        const h=Math.floor(next.remaining/3600),m=Math.floor(next.remaining%3600/60),s=next.remaining%60;
+        eliminationTimer.textContent=[h,m,s].map(v=>String(v).padStart(2,"0")).join(":");
+      }
+    }
     updateLiveBets();
   };
   tick();liveClock.timer=setInterval(tick,250);
@@ -115,7 +141,7 @@ function todayView(){
   if(!state.betsPublished)return `<section class="view"><div class="closing-layout"><article class="bet-closing"><span class="eyebrow">Bet closing at</span><strong id="closingTime">${esc(state.betClosingTime||"--:--")}</strong><div id="countdownBlock" class="closing-countdown" hidden><span>Tempo rimasto</span><strong id="countdownClock" role="timer">--:--:--</strong></div><p>Ready to shoot · Giorno ${state.day}</p></article></div><div class="card awaiting-bets"><h1>Le bet sono ancora riservate</h1><p>Compariranno qui quando l'amministratore cliccherà “Pubblica bet”.</p></div></section>`;
   const withBets=state.players.filter(p=>p[3]);
   return `<section class="view"><div class="hero-grid">
-    <article class="clock-card"><span class="eyebrow">L'orologio di oggi</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span></article>
+    <article class="clock-card"><span class="eyebrow">L'orologio di oggi</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span><p class="next-elimination" id="nextElimination" hidden><span>Next elimination</span> <strong id="nextEliminationName"></strong> in <time id="nextEliminationTimer">--:--:--</time></p></article>
     <div class="time-cards">
       <article class="time-card estimated-card"><span class="eyebrow">Fine stimata</span><strong>${esc(state.estimatedTime||"--:--")}</strong><p>La previsione di fine giornata</p></article>
       <article class="time-card actual-card"><span class="eyebrow">Wrap effettivo</span><strong>${esc(state.wrapTime||"--:--")}</strong><p>${state.wrapTime?"Orario ufficiale":"Ancora da confermare"}</p></article>

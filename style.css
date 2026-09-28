@@ -26,6 +26,8 @@ dialog{border:0;padding:0;background:transparent;color:var(--ink);width:min(640p
 .closing-countdown{margin:20px auto 0;padding:18px 12px;border-top:1px solid #cad8ef;display:flex;flex-direction:column;align-items:center;gap:4px}
 .closing-countdown>span{color:var(--blue);font-weight:650}.closing-countdown>strong{display:block;margin:0;color:var(--blue);font-size:clamp(2.2rem,9vw,4.2rem);font-weight:650;line-height:1.2;font-variant-numeric:tabular-nums;letter-spacing:-.04em}
 .closing-layout .bet-closing>p{margin:18px 0 0}
+.clock-card .next-elimination{margin:12px 0 0;color:#b54355;font-size:clamp(.9rem,2.5vw,1rem);font-weight:650;line-height:1.4;overflow-wrap:anywhere}
+.next-elimination>span{color:var(--muted);font-weight:600}.next-elimination strong,.next-elimination time{color:var(--red);font-weight:750;font-variant-numeric:tabular-nums}
 @media(max-width:560px){.closing-layout .bet-closing{padding:26px 18px}}
 /* Soft, shared-list layout */
 body{background:radial-gradient(ellipse at 90% 5%,#eaf0ff,transparent 40%),var(--bg);line-height:1.5}
