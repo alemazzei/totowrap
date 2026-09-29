@@ -137,6 +137,30 @@ function liveClock(){
   tick();liveClock.timer=setInterval(tick,250);
 }
 
+function previousWinnerSlide(){
+  const previous=state.history.find(day=>Number(day[0])===state.day-1);
+  if(!previous)return "";
+  const points=Number(previous[4])||0;
+  const details=Array.isArray(previous[6])?previous[6]:[];
+  const names=points>0?(details.length?details.filter(item=>Number(item.points)===points).map(item=>item.name):String(previous[1]||"").split(" · ").filter(Boolean)):[];
+  const label=names.length===1?"Vincitore":names.length>1?"Vincitori":"Risultato";
+  const winners=names.length?names.map((name,i)=>`<span class="winner-item"${i?" hidden":""}>${award(points)} ${esc(name)}</span>`).join(""):'<span class="winner-item">Nessun vincitore</span>';
+  return `<aside class="winner-strip" aria-label="${label} del giorno ${esc(previous[0])}"><span class="winner-strip-label">${label} · Day ${esc(previous[0])}</span><div class="winner-viewport">${winners}</div></aside>`;
+}
+function startWinnerSlide(){
+  clearInterval(startWinnerSlide.timer);
+  const items=[...document.querySelectorAll(".winner-strip .winner-item")];
+  if(items.length<2)return;
+  let current=0;
+  startWinnerSlide.timer=setInterval(()=>{
+    items[current].hidden=true;
+    items[current].classList.remove("is-entering");
+    current=(current+1)%items.length;
+    items[current].hidden=false;
+    items[current].classList.add("is-entering");
+  },4000);
+}
+
 function todayView(){
   if(!state.betsPublished)return `<section class="view"><div class="closing-layout"><article class="bet-closing"><span class="eyebrow">Bet closing at</span><strong id="closingTime">${esc(state.betClosingTime||"--:--")}</strong><div id="countdownBlock" class="closing-countdown" hidden><span>Tempo rimasto</span><strong id="countdownClock" role="timer">--:--:--</strong></div><p>Ready to shoot · Giorno ${state.day}</p></article></div><div class="card awaiting-bets"><h1>Le bet sono ancora riservate</h1><p>Compariranno qui quando l'amministratore cliccherà “Pubblica bet”.</p></div></section>`;
   const withBets=state.players.filter(p=>p[3]);
@@ -146,7 +170,7 @@ function todayView(){
       <article class="time-card estimated-card"><span class="eyebrow">Fine stimata</span><strong>${esc(state.estimatedTime||"--:--")}</strong><p>La previsione di fine giornata</p></article>
       <article class="time-card actual-card"><span class="eyebrow">Wrap effettivo</span><strong>${esc(state.wrapTime||"--:--")}</strong><p>${state.wrapTime?"Orario ufficiale":"Ancora da confermare"}</p></article>
     </div>
-  </div><div class="section-head"><div><span class="eyebrow">Giornata ${state.day}</span><h1>${state.dayClosed?"Risultati della giornata":"Le bet di oggi"}</h1></div><span class="count-label">${withBets.length} ${withBets.length===1?"bet inserita":"bet inserite"}</span></div>
+  </div>${previousWinnerSlide()}<div class="section-head"><div><span class="eyebrow">Giornata ${state.day}</span><h1>${state.dayClosed?"Risultati della giornata":"Le bet di oggi"}</h1></div><span class="count-label">${withBets.length} ${withBets.length===1?"bet inserita":"bet inserite"}</span></div>
   <div class="bet-list"><div class="bet-list-head"><span>Orario</span><span>Partecipante</span><span>Fascia di gioco</span><span>Stato</span></div>
   <ol class="bets">${state.players.length?chronologicalPlayers(state.players).map(p=>{const s=status(p[3]),pts=pointsFor(p[3]);return `<li class="bet-row${p[3]?"":" no-bet"}${pts?" winner":""}${s[1]==="out"?" eliminated":""}" data-bet="${esc(p[3]||"")}"><time class="bet-time">${esc(p[3]||"—")}</time><div class="bet-person"><div class="avatar" aria-hidden="true">${esc(initials(p[0]))}</div><h3>${esc(p[0])} ${award(pts)}</h3></div><div class="bet-range">${p[3]?`<span class="mobile-range-label">Fascia </span>${bandLabel(p[3])}`:"Bet non inserita"}</div><span class="pill ${s[1]}">${s[0]}</span></li>`}).join(""):`<li class="empty">Aggiungi i partecipanti dalle impostazioni.</li>`}</ol></div>
   <p class="bet-footnote">Dall'orario più presto al più tardi. <span>3 punti per il minuto esatto · 1 punto per la fascia.</span></p></section>`;
@@ -250,7 +274,8 @@ function render(){
   qs("#dayNumber").textContent=state.day;
   document.querySelectorAll("[data-route]").forEach(b=>b.classList.toggle("active",b.dataset.route===route));
   app.innerHTML=({today:todayView,tables:tablesView,history:historyView})[route]();
-  if(route==="today")liveClock();else clearInterval(liveClock.timer);
+  if(route==="today"){liveClock();startWinnerSlide()}
+  else{clearInterval(liveClock.timer);clearInterval(startWinnerSlide.timer)}
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
