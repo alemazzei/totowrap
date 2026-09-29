@@ -147,6 +147,12 @@ function previousWinnerSlide(){
   const winners=names.length?names.map((name,i)=>`<span class="winner-item"${i?" hidden":""}>${prefix}${award(points)} ${esc(name)}</span>`).join(""):`<span class="winner-item">${prefix}Nessun vincitore</span>`;
   return `<aside class="winner-strip" aria-label="winner day before, giorno ${esc(previous[0])}"><div class="winner-viewport">${winners}</div></aside>`;
 }
+function currentWinnerCard(){
+  const scored=state.players.filter(p=>p[3]).map(p=>({name:p[0],points:pointsFor(p[3])}));
+  const best=Math.max(0,...scored.map(p=>p.points));
+  const winners=scored.filter(p=>best>0&&p.points===best);
+  return `<article class="clock-card current-winner-card"><span class="eyebrow">Winner today · Day ${esc(state.day)}</span><strong class="current-winner-names">${winners.length?winners.map(p=>`<span>${award(p.points)} ${esc(p.name)}</span>`).join(""):'<span>Nessun vincitore</span>'}</strong><span class="date">${best===3?"Orario esatto · 3 pt":best===1?"Fascia oraria · 1 pt":"Nessuna bet vincente"}</span></article>`;
+}
 function startWinnerSlide(){
   clearInterval(startWinnerSlide.timer);
   const items=[...document.querySelectorAll(".winner-strip .winner-item")];
@@ -165,7 +171,7 @@ function todayView(){
   if(!state.betsPublished)return `<section class="view"><div class="closing-layout"><article class="bet-closing"><span class="eyebrow">Bet closing at</span><strong id="closingTime">${esc(state.betClosingTime||"--:--")}</strong><div id="countdownBlock" class="closing-countdown" hidden><span>Tempo rimasto</span><strong id="countdownClock" role="timer">--:--:--</strong></div><p>Ready to shoot · Giorno ${state.day}</p></article></div><div class="card awaiting-bets"><h1>Le bet sono ancora riservate</h1><p>Compariranno qui quando l'amministratore cliccherà “Pubblica bet”.</p></div></section>`;
   const withBets=state.players.filter(p=>p[3]);
   return `<section class="view"><div class="hero-grid">
-    <article class="clock-card"><span class="eyebrow">Live Clock</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span><p class="next-elimination" id="nextElimination" hidden><span>Next elimination</span> <strong id="nextEliminationName"></strong> in <time id="nextEliminationTimer">--:--:--</time></p></article>
+    ${state.wrapTime?currentWinnerCard():`<article class="clock-card"><span class="eyebrow">Live Clock</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span><p class="next-elimination" id="nextElimination" hidden><span>Next elimination</span> <strong id="nextEliminationName"></strong> in <time id="nextEliminationTimer">--:--:--</time></p></article>`}
     <div class="time-cards">
       <article class="time-card estimated-card"><span class="eyebrow">Est. Wrap</span><strong>${esc(state.estimatedTime||"--:--")}</strong></article>
       <article class="time-card actual-card"><span class="eyebrow">Wrap</span><strong>${esc(state.wrapTime||"--:--")}</strong></article>

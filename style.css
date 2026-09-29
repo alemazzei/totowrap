@@ -27,6 +27,7 @@ dialog{border:0;padding:0;background:transparent;color:var(--ink);width:min(640p
 .closing-countdown>span{color:var(--blue);font-weight:650}.closing-countdown>strong{display:block;margin:0;color:var(--blue);font-size:clamp(2.2rem,9vw,4.2rem);font-weight:650;line-height:1.2;font-variant-numeric:tabular-nums;letter-spacing:-.04em}
 .closing-layout .bet-closing>p{margin:18px 0 0}
 .clock-card .next-elimination{margin:12px 0 0;color:#b54355;font-size:clamp(.9rem,2.5vw,1rem);font-weight:650;line-height:1.4;overflow-wrap:anywhere}
+.current-winner-names{display:flex;flex-wrap:wrap;gap:8px 22px;margin:14px 0;color:#2c4da0;font-size:clamp(1.7rem,4.5vw,3.4rem);line-height:1.2;overflow-wrap:anywhere}.current-winner-names>span{display:inline-block}.current-winner-names .award{font-size:.8em}.current-winner-card .date{font-weight:650}
 .next-elimination>span{color:var(--muted);font-weight:600}.next-elimination strong,.next-elimination time{color:var(--red);font-weight:750;font-variant-numeric:tabular-nums}
 .winner-strip{display:flex;align-items:center;gap:20px;margin-top:20px;padding:15px 22px;border-radius:22px;background:#fff;box-shadow:var(--shadow);min-height:66px}
 .winner-strip-label{flex:none;color:var(--blue);font-size:.875rem;font-weight:750}.winner-viewport{flex:1;min-width:0;overflow:hidden;text-align:right}
