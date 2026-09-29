@@ -143,9 +143,9 @@ function previousWinnerSlide(){
   const points=Number(previous[4])||0;
   const details=Array.isArray(previous[6])?previous[6]:[];
   const names=points>0?(details.length?details.filter(item=>Number(item.points)===points).map(item=>item.name):String(previous[1]||"").split(" · ").filter(Boolean)):[];
-  const label=names.length===1?"Vincitore":names.length>1?"Vincitori":"Risultato";
-  const winners=names.length?names.map((name,i)=>`<span class="winner-item"${i?" hidden":""}>${award(points)} ${esc(name)}</span>`).join(""):'<span class="winner-item">Nessun vincitore</span>';
-  return `<aside class="winner-strip" aria-label="${label} del giorno ${esc(previous[0])}"><span class="winner-strip-label">${label} · Day ${esc(previous[0])}</span><div class="winner-viewport">${winners}</div></aside>`;
+  const prefix=`<span class="winner-strip-label">winner day before · Day ${esc(previous[0])}</span> `;
+  const winners=names.length?names.map((name,i)=>`<span class="winner-item"${i?" hidden":""}>${prefix}${award(points)} ${esc(name)}</span>`).join(""):`<span class="winner-item">${prefix}Nessun vincitore</span>`;
+  return `<aside class="winner-strip" aria-label="winner day before, giorno ${esc(previous[0])}"><div class="winner-viewport">${winners}</div></aside>`;
 }
 function startWinnerSlide(){
   clearInterval(startWinnerSlide.timer);
