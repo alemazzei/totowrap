@@ -75,7 +75,7 @@ function expiredBet(t,now=new Date()){
   while(seconds>band.center+DAY_SEC/2)seconds-=DAY_SEC;
   return seconds>band.upper;
 }
-const status = t => { if(!t)return ["No bet","none"];if(!state.wrapTime)return expiredBet(t)?["💀 OUT","out"]:["IN PLAY","pending"];const pts=pointsFor(t); if(pts===3)return ["EXACT · 3 PT","win"]; if(pts===1)return ["BAND · 1 PT","close"]; return ["💀 OUT","out"]; };
+const status = t => { if(!t)return ["this bamboccione forgot to bet","none"];if(!state.wrapTime)return expiredBet(t)?["OUT","out"]:["IN","pending"];const pts=pointsFor(t); if(pts===3)return ["EXACT · 3 PT","win"]; if(pts===1)return ["BAND · 1 PT","close"]; return ["OUT","out"]; };
 function updateLiveBets(){
   document.querySelectorAll(".bet-row[data-bet]").forEach(row=>{const s=status(row.dataset.bet);row.classList.toggle("eliminated",s[1]==="out");const pill=row.querySelector(".pill");pill.className=`pill ${s[1]}`;pill.textContent=s[0]});
 }
@@ -107,8 +107,18 @@ function nextElimination(p){
   }
   return next;
 }
+function firstBandCountdown(p){
+  if(!state.betsPublished||state.wrapTime||state.dayClosed)return null;
+  const bands=[...bettingBands().values()].sort((a,b)=>a.lower-b.lower);
+  const first=bands[0];if(!first)return null;
+  let now=p.hour*3600+p.minute*60+p.second;
+  while(now<first.center-DAY_SEC/2)now+=DAY_SEC;
+  while(now>first.center+DAY_SEC/2)now-=DAY_SEC;
+  return now<first.lower?{start:clock(first.lower),remaining:first.lower-now}:null;
+}
 function liveClock(){
   const el=qs("#liveClock"),date=qs("#liveDate"),closing=qs("#closingTime"),countdown=qs("#countdownBlock"),remainingEl=qs("#countdownClock"),elimination=qs("#nextElimination"),eliminationName=qs("#nextEliminationName"),eliminationTimer=qs("#nextEliminationTimer");
+  const firstBand=qs("#firstBandCountdown"),firstBandTimer=qs("#firstBandTimer");
   clearInterval(liveClock.timer);
   if(!el&&!closing)return;
   const tick=()=>{
@@ -123,6 +133,10 @@ function liveClock(){
       if(left!==null){const remaining=Math.max(0,left),h=Math.floor(remaining/3600),m=Math.floor(remaining%3600/60),s=remaining%60;remainingEl.textContent=[h,m,s].map(v=>String(v).padStart(2,"0")).join(":")}
     }
     if(el){el.textContent=[p.hour,p.minute,p.second].map(v=>String(v).padStart(2,"0")).join(":");date.textContent=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Rome",weekday:"long",day:"numeric",month:"long"}).format(now)}
+    if(firstBand){
+      const first=firstBandCountdown(p);firstBand.hidden=!first;
+      if(first){firstBandTimer.textContent=[Math.floor(first.remaining/3600),Math.floor(first.remaining%3600/60),first.remaining%60].map(v=>String(v).padStart(2,"0")).join(":")}
+    }
     if(elimination){
       const next=nextElimination(p);
       elimination.hidden=!next;
@@ -171,14 +185,14 @@ function todayView(){
   if(!state.betsPublished)return `<section class="view"><div class="closing-layout"><article class="bet-closing"><span class="eyebrow">Bet closing at</span><strong id="closingTime">${esc(state.betClosingTime||"--:--")}</strong><div id="countdownBlock" class="closing-countdown" hidden><span>Time remaining</span><strong id="countdownClock" role="timer">--:--:--</strong></div><p>Ready to shoot · Day ${state.day}</p></article></div><div class="card awaiting-bets"><h1>Bets are still private</h1><p>They will appear here when the administrator clicks “Publish bets”.</p></div></section>`;
   const withBets=state.players.filter(p=>p[3]);
   return `<section class="view"><div class="hero-grid">
-    ${state.wrapTime?currentWinnerCard():`<article class="clock-card"><span class="eyebrow">Live Clock</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span><p class="next-elimination" id="nextElimination" hidden><span>Next elimination</span> <strong id="nextEliminationName"></strong> in <time id="nextEliminationTimer">--:--:--</time></p></article>`}
+    ${state.wrapTime?currentWinnerCard():`<article class="clock-card"><span class="eyebrow">Live Clock</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span><p class="next-elimination" id="firstBandCountdown" hidden><span>if we'll wrap before</span> <time id="firstBandTimer">--:--:--</time></p><p class="next-elimination" id="nextElimination" hidden><span>Next elimination</span> <strong id="nextEliminationName"></strong> in <time id="nextEliminationTimer">--:--:--</time></p></article>`}
     <div class="time-cards">
       <article class="time-card estimated-card"><span class="eyebrow">Est. Wrap</span><strong>${esc(state.estimatedTime||"--:--")}</strong></article>
       <article class="time-card actual-card"><span class="eyebrow">Wrap</span><strong>${esc(state.wrapTime||"--:--")}</strong></article>
     </div>
   </div>${previousWinnerSlide()}<div class="section-head"><div><span class="eyebrow">Day ${state.day}</span><h1>${state.dayClosed?"Day results":"Today’s bets"}</h1></div><span class="count-label">${withBets.length} ${withBets.length===1?"bet placed":"bets placed"}</span></div>
   <div class="bet-list"><div class="bet-list-head"><span>Time</span><span>Player</span><span>Time band</span><span>Status</span></div>
-  <ol class="bets">${state.players.length?chronologicalPlayers(state.players).map(p=>{const s=status(p[3]),pts=pointsFor(p[3]);return `<li class="bet-row${p[3]?"":" no-bet"}${pts?" winner":""}${s[1]==="out"?" eliminated":""}" data-bet="${esc(p[3]||"")}"><time class="bet-time">${esc(p[3]||"—")}</time><div class="bet-person"><div class="avatar" aria-hidden="true">${esc(initials(p[0]))}</div><h3>${esc(p[0])} ${award(pts)}</h3></div><div class="bet-range">${p[3]?`<span class="mobile-range-label">Band </span>${bandLabel(p[3])}`:"bamboccione"}</div><span class="pill ${s[1]}">${s[0]}</span></li>`}).join(""):`<li class="empty">Add players in settings.</li>`}</ol></div>
+  <ol class="bets">${state.players.length?chronologicalPlayers(state.players).map(p=>{const s=status(p[3]),pts=pointsFor(p[3]);return `<li class="bet-row${p[3]?"":" no-bet"}${pts?" winner":""}${s[1]==="out"?" eliminated":""}" data-bet="${esc(p[3]||"")}"><time class="bet-time">${esc(p[3]||"—")}</time><div class="bet-person"><div class="avatar" aria-hidden="true">${esc(initials(p[0]))}</div><h3>${esc(p[0])} ${award(pts)}</h3></div><div class="bet-range">${p[3]?`<span class="mobile-range-label">Band </span>${bandLabel(p[3])}`:""}</div><span class="pill ${s[1]}">${s[0]}</span></li>`}).join(""):`<li class="empty">Add players in settings.</li>`}</ol></div>
   <p class="bet-footnote">From earliest to latest. <span>3 points for the exact minute · 1 point for the time band.</span></p></section>`;
 }
 
