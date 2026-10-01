@@ -33,7 +33,6 @@ const clone = v => JSON.parse(JSON.stringify(v));
 let state = clone(original);
 let isAdmin=false;
 let route = (location.hash || "#today").slice(1);
-let accuracyOrder = "best";
 let accuracyPlayer = null;
 let tablesTab = "standings";
 let privateBets={};
@@ -246,10 +245,10 @@ function standingsView(){
 }
 
 function accuracyView(){
-  const sorted=[...state.players].sort((a,b)=>{if(!a[5]&&!b[5])return a[0].localeCompare(b[0]);if(!a[5])return 1;if(!b[5])return -1;return accuracyOrder==="best"?a[4]-b[4]:b[4]-a[4]});
+  const sorted=[...state.players].sort((a,b)=>{if(!a[5]&&!b[5])return a[0].localeCompare(b[0]);if(!a[5])return 1;if(!b[5])return -1;return a[4]-b[4]});
   if(!state.players.some(p=>p[0]===accuracyPlayer))accuracyPlayer=sorted[0]?.[0]||"";
   if(!sorted.length)return `<section class="view"><div class="section-head"><div><span class="eyebrow">STATISTICS</span><h1>Average accuracy</h1></div></div><div class="card empty">Statistics will appear after the first completed days.</div></section>`;
-  return `<section class="view"><div class="section-head"><div><span class="eyebrow">STATISTICS</span><h1>Average accuracy</h1></div><div class="segmented"><button class="${accuracyOrder==="best"?"active":""}" data-order="best">Most accurate</button><button class="${accuracyOrder==="worst"?"active":""}" data-order="worst">Least accurate</button></div></div>
+  return `<section class="view"><div class="section-head"><div><span class="eyebrow">STATISTICS</span><h1>Average accuracy</h1></div></div>
   ${accuracyChart()}<p class="helper">Select a player to see their progress on the chart.</p><div class="card accuracy-list">${sorted.map((p,i)=>{const winRate=p[5]?Math.round(p[2]/p[5]*100):0;return `<button class="accuracy-row${p[0]===accuracyPlayer?" selected":""}" data-accuracy-name="${esc(p[0])}" aria-pressed="${p[0]===accuracyPlayer}"><span class="rank-no">${i+1}</span><span class="bet-person"><span class="avatar">${esc(initials(p[0]))}</span><strong>${esc(p[0])}</strong></span><span class="accuracy-average"><strong>${p[5]?fmtAvg(p[4]):"—"}</strong><small>Average error</small></span><span class="accuracy-wins"><strong>${winRate}% win rate</strong><small>${p[2]} out of ${p[5]} bets</small></span><span aria-hidden="true">↗</span></button>`}).join("")}</div></section>`;
 }
 
@@ -302,7 +301,6 @@ function render(){
 document.addEventListener("click",e=>{
   const tab=e.target.closest("[data-tables-tab]");if(tab){tablesTab=tab.dataset.tablesTab;route="tables";render()}
   const nav=e.target.closest("[data-route]"); if(nav){route=nav.dataset.route;location.hash=route;render()}
-  const order=e.target.closest("[data-order]"); if(order){accuracyOrder=order.dataset.order;render()}
   const person=e.target.closest("[data-accuracy-name]");if(person){accuracyPlayer=person.dataset.accuracyName;render()}
   const row=e.target.closest(".history-summary"); if(row){const parent=row.closest(".history-row");parent.classList.toggle("open");row.setAttribute("aria-expanded",parent.classList.contains("open"))}
 });
