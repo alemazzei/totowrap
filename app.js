@@ -313,6 +313,7 @@ function setAdminTab(tab){
   document.querySelectorAll("[data-admin-page]").forEach(page=>page.classList.toggle("active",page.dataset.adminPage===tab));
 }
 function refreshPlayers(selected=0){
+  qs("#correctWrap").hidden=!state.dayClosed;
   qs("#saveBets").textContent=state.betsPublished?"Salva modifiche alle bet pubblicate":"Salva bet private";
   qs("#publishBets").hidden=state.betsPublished;
   playerInput.innerHTML=state.players.length?state.players.map((p,i)=>`<option value="${i}">${esc(p[0])}</option>`).join(""):`<option value="">Nessun partecipante</option>`;
@@ -378,6 +379,40 @@ async function closeDayAt(wrap,successMessage){
   },successMessage);
   if(saved){dialog.close();route="today";location.hash=route;render()}
 }
+function correctClosedWrap(wrap){
+  const index=state.history.findIndex(day=>Number(day[0])===Number(state.day));
+  const previous=state.history[index];
+  if(!state.dayClosed||!previous||!Array.isArray(previous[6]))throw new Error("Dati della giornata non disponibili per la correzione");
+  const oldDetails=previous[6];
+  const dayPlayers=oldDetails.map(item=>[item.name,0,0,item.bet]);
+  const bands=bettingBands(dayPlayers);
+  const newDetails=oldDetails.map(item=>{
+    const band=bands.get(item.bet),raw=toSec(wrap);let adjusted=raw;
+    if(band){while(adjusted<band.center-DAY_SEC/2)adjusted+=DAY_SEC;while(adjusted>band.center+DAY_SEC/2)adjusted-=DAY_SEC}
+    const points=item.bet.slice(0,5)===wrap.slice(0,5)?3:band&&adjusted>=band.lower&&adjusted<=band.upper?1:0;
+    const distance=Math.abs(betOffsetSeconds(item.bet,wrap))/60;
+    const errorMin=Math.round(distance*10)/10;
+    return {...item,points,errorMin};
+  });
+  state.players.forEach(player=>{
+    const old=oldDetails.find(item=>item.name===player[0]),updated=newDetails.find(item=>item.name===player[0]);
+    if(!old||!updated)return;
+    player[1]+=updated.points-old.points;
+    player[2]+=Number(updated.points>0)-Number(old.points>0);
+    if(player[5]>0)player[4]=Math.max(0,(player[4]*player[5]-old.errorMin+updated.errorMin)/player[5]);
+  });
+  const best=Math.max(0,...newDetails.map(item=>item.points)),winners=newDetails.filter(item=>best>0&&item.points===best);
+  state.history[index]=[previous[0],winners.length?winners.map(item=>item.name).join(" · "):"Nessun vincitore",winners.length?winners.map(item=>item.bet).join(" · "):"—",wrap,best,previous[5],newDetails,previous[7]];
+  state.wrapTime=wrap;
+}
+qs("#correctWrap").addEventListener("click",async()=>{
+  if(!isAdmin||!state.dayClosed)return;
+  const wrap=qs("#wrapTimeInput").value;
+  if(!wrap)return toast("Inserisci il wrap corretto nel campo manuale");
+  if(!state.history.some(day=>Number(day[0])===Number(state.day)&&Array.isArray(day[6])))return toast("Dati della giornata non disponibili per la correzione");
+  if(!confirm(`Correggere il wrap del giorno ${state.day} da ${state.wrapTime} a ${wrap}? Punti, vincitori, precisione e storico saranno ricalcolati.`))return;
+  if(await mutateAndSave(()=>correctClosedWrap(wrap),"Wrap corretto: risultati ricalcolati")){dialog.close();route="today";location.hash=route;render()}
+});
 qs("#wrapNow").addEventListener("click",async()=>{
   const now=new Date();
   const exact=[now.getHours(),now.getMinutes(),now.getSeconds()].map(value=>String(value).padStart(2,"0")).join(":");

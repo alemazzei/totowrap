@@ -148,6 +148,8 @@
         </form>
         <button type="button" class="wrap-now" id="wrapNow">WRAP ORA · chiudi e assegna i punti</button>
         <button type="button" class="finalize" id="finalizeDay">Chiudi usando il wrap inserito manualmente</button>
+        <button type="button" class="finalize" id="correctWrap" hidden>Correggi wrap e ricalcola la giornata</button>
+        <p class="field-note">Per correggere una giornata appena chiusa, inserisci il wrap corretto nel campo manuale e premi “Correggi wrap”. Puoi farlo prima di avviare il giorno successivo.</p>
         <button type="button" class="advance-day" id="advanceDay">Avvia il giorno successivo</button>
         <button type="button" class="reset-all" id="resetDemo">Azzera completamente TotoWrap</button>
       </section>
@@ -173,6 +175,6 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261001-en-4" onerror="window.totowrapLoadFailed()"></script>
+  <script type="module" src="app.js?v=20261001-en-5" onerror="window.totowrapLoadFailed()"></script>
 </body>
 </html>
