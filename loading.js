@@ -1,5 +1,5 @@
 (() => {
-  const phrases = ["Complimenti Colette per la vittoria del TotoWrap"];
+  const phrases = ["CONGRATULATIONS COLETTE ON WINNING TOTOWRAP"];
   const screen = document.getElementById("loadingScreen");
   const quote = document.getElementById("loadingQuote");
   let index = 0;
