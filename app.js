@@ -74,7 +74,7 @@ function expiredBet(t,now=new Date()){
   while(seconds>band.center+DAY_SEC/2)seconds-=DAY_SEC;
   return seconds>band.upper;
 }
-const status = t => { if(!t)return ["this bamboccione forgot to bet","none"];if(!state.wrapTime)return expiredBet(t)?["OUT","out"]:["IN","pending"];const pts=pointsFor(t); if(pts===3)return ["EXACT · 3 PT","win"]; if(pts===1)return ["BAND · 1 PT","close"]; return ["OUT","out"]; };
+const status = t => { if(!t)return ["this bamboccione forgot to bet","none"];if(!state.wrapTime)return expiredBet(t)?["🫕 OUT","out"]:["IN","pending"];const pts=pointsFor(t); if(pts===3)return ["EXACT · 3 PT","win"]; if(pts===1)return ["BAND · 1 PT","close"]; return ["🫕 OUT","out"]; };
 function updateLiveBets(){
   document.querySelectorAll(".bet-row[data-bet]").forEach(row=>{const s=status(row.dataset.bet);row.classList.toggle("eliminated",s[1]==="out");const pill=row.querySelector(".pill");pill.className=`pill ${s[1]}`;pill.textContent=s[0]});
 }
@@ -137,7 +137,7 @@ function liveClock(){
       if(first){firstBandTimer.textContent=[Math.floor(first.remaining/3600),Math.floor(first.remaining%3600/60),first.remaining%60].map(v=>String(v).padStart(2,"0")).join(":")}
     }
     if(elimination){
-      const next=nextElimination(p);
+      const next=firstBandCountdown(p)?null:nextElimination(p);
       elimination.hidden=!next;
       if(next){
         eliminationName.textContent=next.names.join(" and ");
@@ -287,7 +287,7 @@ function historyView(){
    const winnerMarkup=winners.length?winners.map(item=>`<span class="historical-winner">${esc(item.name)} ${award(item.points)}<small>Bet ${esc(item.bet)} · +${item.points} pt</small></span>`).join(""):h[4]>0?String(h[1]).split(" · ").map(name=>`<span class="historical-winner">${esc(name)} ${award(h[4])}<small>Bet ${esc(h[2])}</small></span>`).join(""):"No winner";
    const roster=Array.isArray(h[7])?h[7]:details.map(item=>item.name);
    const rows=[...details,...roster.filter(name=>!details.some(item=>item.name===name)).map(name=>({name,bet:null,points:0}))].sort((a,b)=>(toSec(a.bet)??Infinity)-(toSec(b.bet)??Infinity)||a.name.localeCompare(b.name,"en"));
-   return `<article class="card history-row"><button class="history-summary" aria-expanded="false"><span class="history-day">TotoWrap<br>Day ${esc(h[0])}</span><span class="history-winner">${winnerMarkup}</span><span class="history-official"><small>Wrap</small><strong>${esc(h[3])}</strong></span><span>⌄</span></button><div class="history-detail"><div class="history-meta"><span>Est. Wrap <strong>${esc(h[5]||"—")}</strong></span><span>Wrap <strong>${esc(h[3])}</strong></span></div><h3>All bets for the day</h3><ol class="history-bets">${rows.length?rows.map(item=>`<li class="history-bet${item.points>0?" winner":""}"><time>${esc(item.bet||"—")}</time><span class="history-bet-person">${esc(item.name)} ${award(item.points)}</span><span class="history-band">${esc(item.band||"")}</span><span class="pill ${!item.bet?"none":item.points===3?"win":item.points===1?"close":"out"}">${!item.bet?"Missed bet":item.points===3?"EXACT · 3 PT":item.points===1?"BAND · 1 PT":"💀 OUT"}</span></li>`).join(""):`<li class="empty">Other bets are not available for this older day.</li>`}</ol></div></article>`;
+   return `<article class="card history-row"><button class="history-summary" aria-expanded="false"><span class="history-day">TotoWrap<br>Day ${esc(h[0])}</span><span class="history-winner">${winnerMarkup}</span><span class="history-official"><small>Wrap</small><strong>${esc(h[3])}</strong></span><span>⌄</span></button><div class="history-detail"><div class="history-meta"><span>Est. Wrap <strong>${esc(h[5]||"—")}</strong></span><span>Wrap <strong>${esc(h[3])}</strong></span></div><h3>All bets for the day</h3><ol class="history-bets">${rows.length?rows.map(item=>`<li class="history-bet${item.points>0?" winner":""}"><time>${esc(item.bet||"—")}</time><span class="history-bet-person">${esc(item.name)} ${award(item.points)}</span><span class="history-band">${esc(item.band||"")}</span><span class="pill ${!item.bet?"none":item.points===3?"win":item.points===1?"close":"out"}">${!item.bet?"Missed bet":item.points===3?"EXACT · 3 PT":item.points===1?"BAND · 1 PT":"🫕 OUT"}</span></li>`).join(""):`<li class="empty">Other bets are not available for this older day.</li>`}</ol></div></article>`;
  }).join("")||`<div class="card empty">No completed days yet.</div>`}</div></section>`;
 }
 
