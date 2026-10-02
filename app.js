@@ -257,9 +257,12 @@ function accuracyChart(){
   [...state.history].sort((a,b)=>a[0]-b[0]).forEach(day=>{
     const details=Array.isArray(day[6])?day[6]:[];
     details.forEach(item=>{
-      if(!item?.name||!Number.isFinite(item.errorMin))return;
+      if(!item?.name||!item.bet)return;
+      const offset=betOffsetSeconds(item.bet,day[3]);
+      const error=offset!==null?Math.abs(offset)/60:item.errorMin!==null&&item.errorMin!==undefined&&item.errorMin!==""?Number(item.errorMin):NaN;
+      if(!Number.isFinite(error))return;
       if(!seriesByPlayer.has(item.name))seriesByPlayer.set(item.name,[]);
-      seriesByPlayer.get(item.name).push({day:day[0],error:item.errorMin,won:item.points>0});
+      seriesByPlayer.get(item.name).push({day:Number(day[0]),error,won:Number(item.points)>0});
     });
   });
   const points=seriesByPlayer.get(accuracyPlayer)||[];
@@ -320,6 +323,42 @@ function refreshPlayers(selected=0){
   playerInput.value=state.players.length?String(Math.min(selected,state.players.length-1)):"";
   qs("#bulkBets").innerHTML=state.players.length?state.players.map((p,i)=>`<label class="bulk-bet-row"><span>${esc(p[0])}</span><input type="time" step="1" value="${(state.betsPublished?p[3]:draftDay===state.day?privateBets[p[0]]:null)||""}" data-bet-index="${i}" aria-label="Bet di ${esc(p[0])}"></label>`).join(""):`<div class="bulk-empty">Aggiungi prima i partecipanti.</div>`;
 }
+function normalizeBetName(name){return name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+function parseBetRecap(text){
+  const rows=new Map(),invalid=[];
+  text.split(/\r?\n/).forEach((raw,i)=>{
+    let line=raw.trim().replace(/^[-•*]\s*/,'').replace(/\*\*/g,'');
+    if(!line||/^\|?\s*[-:]+\s*(\|\s*[-:]+\s*)+\|?$/.test(line)||/^\|?\s*(Orario|Time)\s*\|/i.test(line))return;
+    let name,time;
+    if(line.startsWith('|')){const cells=line.split('|').map(v=>v.trim()).filter(Boolean);if(cells.length!==2)return;const ti=cells.findIndex(v=>/^\d{1,2}[:.]\d{2}(?::\d{2})?$/.test(v));if(ti<0)return;time=cells[ti];name=cells[1-ti]}
+    else{const match=line.match(/^(\d{1,2}[:.]\d{2}(?::\d{2})?)\s*(?:[-–—|]\s*)?(.+)$/)||line.match(/^(.+?)\s*(?:[-–—|:]\s*|\s+)(\d{1,2}[:.]\d{2}(?::\d{2})?)$/);if(!match){if(/\d{1,2}[:.]\d{2}/.test(line))invalid.push(i+1);return}if(/^\d/.test(match[1])){time=match[1];name=match[2]}else{name=match[1];time=match[2]}}
+    const parts=time.replace('.',':').split(':').map(Number);if(parts[0]>23||parts[1]>59||(parts[2]||0)>59||!normalizeBetName(name)){invalid.push(i+1);return}
+    time=parts.map(v=>String(v).padStart(2,'0')).join(':');rows.set(normalizeBetName(name),{name,time});
+  });return {rows:[...rows.values()],invalid};
+}
+function matchRecapPlayer(name,players){
+  const key=normalizeBetName(name),exact=players.filter(p=>normalizeBetName(p[0])===key);if(exact.length===1)return exact[0][0];
+  const tokens=key.split(' '),matches=players.filter(p=>{const words=normalizeBetName(p[0]).split(' ');return tokens.length>=2&&(tokens.every(t=>words.includes(t))||words.length>=2&&words.every(t=>tokens.includes(t)))});
+  return matches.length===1?matches[0][0]:'';
+}
+let recapRows=[];
+qs('#previewRecap').addEventListener('click',()=>{
+  if(!isAdmin||state.dayClosed)return toast('Giornata chiusa: avvia prima il giorno successivo');
+  const parsed=parseBetRecap(qs('#betRecapInput').value);recapRows=parsed.rows;
+  qs('#recapPreview').innerHTML=recapRows.map((row,i)=>{const matched=matchRecapPlayer(row.name,state.players);return `<label class="recap-row"><span>${esc(row.name)} · <strong>${esc(row.time)}</strong></span><select data-recap-row="${i}" aria-label="Partecipante per ${esc(row.name)}"><option value="">Scegli partecipante</option>${state.players.map(p=>`<option value="${esc(p[0])}"${matched===p[0]?' selected':''}>${esc(p[0])}</option>`).join('')}</select></label>`}).join('');
+  const unresolved=recapRows.filter(row=>!matchRecapPlayer(row.name,state.players)).length;
+  qs('#recapMessage').textContent=`${recapRows.length} bet riconosciute. ${unresolved?`${unresolved} nomi da associare manualmente. `:''}${parsed.invalid.length?`Controlla le righe non valide: ${parsed.invalid.join(', ')}. `:''}Le persone non presenti nel recap manterranno il valore già inserito. Se manca un partecipante, aggiungilo e ripeti l’anteprima.`;
+  qs('#applyRecap').hidden=!recapRows.length||!!parsed.invalid.length;
+});
+qs('#applyRecap').addEventListener('click',()=>{
+  if(!isAdmin||state.dayClosed)return;
+  const selections=[...document.querySelectorAll('[data-recap-row]')];
+  if(!selections.length||selections.some(s=>!s.value||!state.players.some(p=>p[0]===s.value)))return toast('Associa tutti i nomi ai partecipanti prima di applicare');
+  const updates=new Map(selections.map(s=>[s.value,recapRows[Number(s.dataset.recapRow)].time]));
+  document.querySelectorAll('[data-bet-index]').forEach(input=>{const name=state.players[Number(input.dataset.betIndex)]?.[0];if(updates.has(name))input.value=updates.get(name)});
+  toast(`${updates.size} bet compilate: premi Salva per registrarle`);
+});
+
 async function mutateAndSave(mutator,success){const before=clone(state);mutator();try{await persist();render();toast(success);return true}catch(error){state=before;render();console.error(error);toast("Salvataggio non riuscito: riprova");return false}}
 async function openAdminSettings(){
   if(!isAdmin)return;

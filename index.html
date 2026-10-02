@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=21">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="TotoWrap">
-  <link rel="stylesheet" href="style.css?v=20261001-en-1">
+  <link rel="stylesheet" href="style.css?v=20261002-import-1">
   <style>
     #loadingScreen{position:fixed;inset:0;z-index:100;background:#f4f7fd;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:30px;overflow-y:auto;font-family:system-ui,sans-serif;perspective:900px}
     #loadingScreen[hidden]{display:none!important}
@@ -114,6 +114,14 @@
 
       <section class="admin-page active" data-admin-page="bets">
         <form id="betsForm">
+          <details class="recap-import"><summary>Importa bet dal recap</summary>
+            <label>Incolla il recap<textarea id="betRecapInput" rows="7" placeholder="15:32 — Ludovica Mercuri&#10;16:03 — Leonardo Greco"></textarea></label>
+            <p class="field-note">Accetta l’elenco o la tabella del recap. Controlla l’anteprima, applica le bet e poi salvale con il pulsante abituale.</p>
+            <button type="button" class="secondary" id="previewRecap">Mostra anteprima</button>
+            <p class="field-note" id="recapMessage" aria-live="polite"></p>
+            <div id="recapPreview"></div>
+            <button type="button" class="primary save-page" id="applyRecap" hidden>Compila tutte le bet dal recap</button>
+          </details>
           <div class="bulk-bets-head"><span>Bet dei partecipanti</span><small>Inseriscile tutte e salva una volta</small></div>
           <div class="bulk-bets" id="bulkBets"></div>
           <button type="submit" class="primary save-page" id="saveBets">Salva bet private</button>
@@ -175,6 +183,6 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261001-en-5" onerror="window.totowrapLoadFailed()"></script>
+  <script type="module" src="app.js?v=20261002-import-chart-1" onerror="window.totowrapLoadFailed()"></script>
 </body>
 </html>
