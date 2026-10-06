@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=21">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="TotoWrap">
-  <link rel="stylesheet" href="style.css?v=20261002-fit-chart-1">
+  <link rel="stylesheet" href="style.css?v=20261006-adjustments-1">
   <style>
     #loadingScreen{position:fixed;inset:0;z-index:100;background:#f4f7fd;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:30px;overflow-y:auto;font-family:system-ui,sans-serif;perspective:900px}
     #loadingScreen[hidden]{display:none!important}
@@ -110,6 +110,7 @@
       <div class="admin-tabs" role="tablist" aria-label="Sezioni amministratore">
         <button type="button" class="active" data-admin-tab="bets" role="tab">Partecipanti e bet</button>
         <button type="button" data-admin-tab="day" role="tab">Wrap e giornata</button>
+        <button type="button" data-admin-tab="points" role="tab">Bonus e malus</button>
       </div>
 
       <section class="admin-page active" data-admin-page="bets">
@@ -171,6 +172,18 @@
         <button type="button" class="advance-day" id="advanceDay">Avvia il giorno successivo</button>
         <button type="button" class="reset-all" id="resetDemo">Azzera completamente TotoWrap</button>
       </section>
+      <section class="admin-page" data-admin-page="points">
+        <form id="pointAdjustmentForm">
+          <h3>Correggi punti</h3>
+          <label>Giocatore<select id="adjustPlayer"></select></label>
+          <label>Variazione punti<input id="pointDelta" type="number" min="-1000" max="1000" step="1" placeholder="Es. 2 per bonus, -1 per malus" required></label>
+          <label>Motivo (facoltativo)<input id="pointReason" type="text" maxlength="150" placeholder="Es. bonus Crazy Day"></label>
+          <p class="field-note">I punti vengono aggiunti o sottratti al totale della classifica. Vittorie e precisione delle bet restano invariate. Disponibile anche a giornata chiusa.</p>
+          <button type="submit" class="primary save-page" id="applyPointAdjustment">Applica correzione punti</button>
+        </form>
+        <h3>Registro bonus e malus</h3>
+        <div id="pointAdjustmentsLog"></div>
+      </section>
       <p class="helper">Ogni modifica viene salvata nel database condiviso e appare in tempo reale su tutti i dispositivi.</p>
     </div>
   </dialog>
@@ -193,6 +206,6 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261006-day-rules-1" onerror="window.totowrapLoadFailed()"></script>
+  <script type="module" src="app.js?v=20261006-adjustments-1" onerror="window.totowrapLoadFailed()"></script>
 </body>
 </html>

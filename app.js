@@ -27,6 +27,7 @@ const original = {
   betClosingTime: "",
   betClosingDate: "",
   players: [],
+  pointAdjustments: [],
   history: []
 };
 
@@ -333,6 +334,7 @@ function setAdminTab(tab){
   document.querySelectorAll("[data-admin-page]").forEach(page=>page.classList.toggle("active",page.dataset.adminPage===tab));
 }
 function refreshPlayers(selected=0){
+  refreshPointAdjustments();
   qs("#correctWrap").hidden=!state.dayClosed;
   qs("#saveBets").textContent=state.betsPublished?"Salva modifiche alle bet pubblicate":"Salva bet private";
   qs("#publishBets").hidden=state.betsPublished;
@@ -374,6 +376,46 @@ qs('#applyRecap').addEventListener('click',()=>{
   const updates=new Map(selections.map(s=>[s.value,recapRows[Number(s.dataset.recapRow)].time]));
   document.querySelectorAll('[data-bet-index]').forEach(input=>{const name=state.players[Number(input.dataset.betIndex)]?.[0];if(updates.has(name))input.value=updates.get(name)});
   toast(`${updates.size} bet compilate: premi Salva per registrarle`);
+});
+
+function applyPointAdjustment(name,delta,reason=''){
+  const player=state.players.find(p=>p[0]===name);
+  if(!player)throw new Error('Partecipante non disponibile');
+  if(!Number.isInteger(delta)||delta===0||Math.abs(delta)>1000)throw new Error('Inserisci una variazione intera da -1000 a +1000, diversa da zero');
+  if(!Array.isArray(state.pointAdjustments))state.pointAdjustments=[];
+  player[1]+=delta;
+  state.pointAdjustments.push({id:`${Date.now()}-${Math.random().toString(36).slice(2)}`,name,delta,reason:reason.trim().slice(0,150),day:state.day,createdAt:new Date().toISOString()});
+}
+function cancelPointAdjustment(id){
+  const item=(state.pointAdjustments||[]).find(a=>a.id===id);
+  if(!item||item.cancelled)throw new Error('Correzione già annullata o non disponibile');
+  const player=state.players.find(p=>p[0]===item.name);
+  if(!player)throw new Error('Il partecipante non è più presente');
+  player[1]-=item.delta;item.cancelled=true;
+}
+function refreshPointAdjustments(){
+  const select=qs('#adjustPlayer'),selected=select.value;
+  select.innerHTML=state.players.length?state.players.map(p=>`<option value="${esc(p[0])}">${esc(p[0])} · ${p[1]} pt</option>`).join(''):'<option value="">Nessun partecipante</option>';
+  if(state.players.some(p=>p[0]===selected))select.value=selected;
+  qs('#applyPointAdjustment').disabled=!state.players.length;
+  qs('#pointAdjustmentsLog').innerHTML=[...(state.pointAdjustments||[])].reverse().map(item=>`<div class="point-adjustment-entry"><span><strong>${esc(item.name)} · ${item.delta>0?'+':''}${item.delta} pt</strong><small>Giorno ${esc(item.day)}${item.reason?` · ${esc(item.reason)}`:''}${item.cancelled?' · Annullato':''}</small></span>${!item.cancelled?`<button type="button" class="secondary" data-cancel-adjustment="${esc(item.id)}">Annulla</button>`:''}</div>`).join('')||'<p class="field-note">Nessuna correzione punti applicata.</p>';
+}
+qs('#pointAdjustmentForm').addEventListener('submit',async e=>{
+  e.preventDefault();if(!isAdmin)return;
+  const name=qs('#adjustPlayer').value,raw=qs('#pointDelta').value,delta=Number(raw),reason=qs('#pointReason').value;
+  if(!name)return toast('Seleziona un partecipante');
+  if(!raw.trim()||!Number.isInteger(delta)||delta===0||Math.abs(delta)>1000)return toast('Inserisci una variazione intera da -1000 a +1000, diversa da zero');
+  const button=qs('#applyPointAdjustment');button.disabled=true;
+  try{if(await mutateAndSave(()=>applyPointAdjustment(name,delta,reason),`${name}: ${delta>0?'+':''}${delta} punti applicati`)){qs('#pointDelta').value='';qs('#pointReason').value='';refreshPointAdjustments()}}finally{button.disabled=!state.players.length}
+});
+qs('#pointAdjustmentsLog').addEventListener('click',async e=>{
+  const button=e.target.closest('[data-cancel-adjustment]');if(!button||!isAdmin)return;
+  const item=(state.pointAdjustments||[]).find(a=>a.id===button.dataset.cancelAdjustment);
+  if(!item||item.cancelled)return;
+  if(!state.players.some(p=>p[0]===item.name))return toast('Il partecipante non è più presente');
+  if(!confirm(`Annullare la correzione di ${item.delta>0?'+':''}${item.delta} punti per ${item.name}?`))return;
+  button.disabled=true;
+  if(await mutateAndSave(()=>cancelPointAdjustment(item.id),'Correzione punti annullata'))refreshPointAdjustments();else button.disabled=false;
 });
 
 async function mutateAndSave(mutator,success){const before=clone(state);mutator();try{await persist();render();toast(success);return true}catch(error){state=before;render();console.error(error);toast("Salvataggio non riuscito: riprova");return false}}
@@ -506,7 +548,7 @@ onSnapshot(STATE_REF,snapshot=>{
     try{remote=JSON.parse(stored.payload)}
     catch(error){console.error(error);window.totowrapLoadFailed?.();toast("Invalid database data");return}
   }
-  state={...clone(original),...remote,betsPublished:typeof remote.betsPublished==="boolean"?remote.betsPublished:(remote.players||[]).some(p=>p[3])||!!remote.dayClosed,players:Array.isArray(remote.players)?remote.players:[],history:Array.isArray(remote.history)?remote.history:[]};
+  state={...clone(original),...remote,betsPublished:typeof remote.betsPublished==="boolean"?remote.betsPublished:(remote.players||[]).some(p=>p[3])||!!remote.dayClosed,players:Array.isArray(remote.players)?remote.players:[],pointAdjustments:Array.isArray(remote.pointAdjustments)?remote.pointAdjustments:[],history:Array.isArray(remote.history)?remote.history:[]};
   render();
   window.totowrapReady?.();
 },error=>{console.error(error);window.totowrapLoadFailed?.();toast("Database temporarily unavailable")});

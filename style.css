@@ -140,3 +140,5 @@ body{background:radial-gradient(circle at 90% -10%,rgba(85,168,255,.17),transpar
 .icon-btn.admin-on{border-color:var(--blue);color:var(--blue);box-shadow:0 0 20px rgba(85,168,255,.15)}
 
 .recap-import{margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:18px}.recap-import summary{cursor:pointer;font-weight:700}.recap-import textarea{width:100%;resize:vertical;border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;color:var(--ink);font:inherit}.recap-import .secondary{padding:10px 16px;border-radius:12px}.recap-row{padding:10px 0;border-bottom:1px solid var(--line)}#recapPreview{max-height:260px;overflow:auto}.recap-import #recapMessage{margin-top:14px}
+
+.point-adjustment-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.point-adjustment-entry span{min-width:0;overflow-wrap:anywhere}.point-adjustment-entry small{display:block;margin-top:4px;color:var(--muted)}.point-adjustment-entry button{padding:8px 12px;border-radius:12px;flex:none}.admin-tabs{flex-wrap:wrap}
