@@ -142,3 +142,21 @@ body{background:radial-gradient(circle at 90% -10%,rgba(85,168,255,.17),transpar
 .recap-import{margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:18px}.recap-import summary{cursor:pointer;font-weight:700}.recap-import textarea{width:100%;resize:vertical;border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;color:var(--ink);font:inherit}.recap-import .secondary{padding:10px 16px;border-radius:12px}.recap-row{padding:10px 0;border-bottom:1px solid var(--line)}#recapPreview{max-height:260px;overflow:auto}.recap-import #recapMessage{margin-top:14px}
 
 .point-adjustment-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.point-adjustment-entry span{min-width:0;overflow-wrap:anywhere}.point-adjustment-entry small{display:block;margin-top:4px;color:var(--muted)}.point-adjustment-entry button{padding:8px 12px;border-radius:12px;flex:none}.admin-tabs{flex-wrap:wrap}
+
+.desktop-sidebar{display:contents}.mini-standings{display:none}
+@media(min-width:1100px){
+ .shell{width:min(1500px,100%);display:grid;grid-template-columns:230px minmax(0,1fr);column-gap:36px;padding:0 36px 52px;align-content:start}
+ .shell>.topbar{grid-column:1/-1}
+ .desktop-sidebar{display:block;grid-column:1;grid-row:2;position:sticky;top:24px;align-self:start}
+ .desktop-sidebar .nav{display:flex;flex-direction:column;position:static;width:100%;margin:0 0 24px;padding:8px;border-radius:24px;gap:6px}
+ .desktop-sidebar .nav button{text-align:left;border-radius:18px;padding:15px 18px}
+ .desktop-sidebar .nav button span{display:inline-block;margin-right:10px}
+ .mini-standings{display:block;background:#fff;padding:20px 16px;border-radius:24px;box-shadow:var(--shadow)}
+ .mini-standings .eyebrow{color:var(--blue);font-weight:700}
+ .mini-standings ol{list-style:none;margin:14px 0;padding:0}
+ .mini-standings li{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--line);font-size:.85rem}
+ .mini-standings li:last-child{border-bottom:0}.mini-rank{color:var(--muted)}.mini-player{overflow-wrap:anywhere}.mini-standings strong{color:var(--blue)}.mini-standings small{font-weight:500}
+ .mini-standings>button{border:0;background:#edf2ff;color:var(--blue);width:100%;padding:12px 8px;border-radius:14px;cursor:pointer;font-size:.85rem;font-weight:650}
+ #app{grid-column:2;grid-row:2;min-width:0}.desktop-sidebar+.view{min-width:0}
+ .bet-list-head,.bet-row{grid-template-columns:90px minmax(100px,1fr) minmax(140px,1fr) 125px;gap:12px}
+}

@@ -256,7 +256,7 @@ function standingsView(){
   const sorted=[...state.players].sort((a,b)=>b[1]-a[1]||b[2]-a[2]); const max=Math.max(...sorted.map(p=>p[1]),1);
   if(!sorted.length)return `<section class="view"><div class="section-head"><div><span class="eyebrow">TOTAL POINTS</span><h1>Overall standings</h1></div></div><div class="card empty">The standings will appear once players have been added.</div></section>`;
   return `<section class="view"><div class="section-head"><div><span class="eyebrow">TOTAL POINTS</span><h1>Overall standings</h1></div><p>${state.players.length} players</p></div>
-  <div class="podium">${sorted.slice(0,3).map((p,i)=>`<article class="card podium-card"><div><span class="place">PLACE ${i+1}</span><h2>${esc(p[0])}</h2><span class="bet-meta">${p[2]} games won</span></div><div class="score">${p[1]} <small>pt</small></div></article>`).join("")}</div>
+
   <p class="helper">Click a player to view their statistics.</p><div class="card rank-list">${sorted.map((p,i)=>`<details class="rank-entry"><summary class="rank-row"><span class="rank-no">${i+1}</span><span class="rank-person"><strong>${esc(p[0])}</strong><span class="bet-meta">${p[2]} games won</span></span><span class="rank-bar"><i style="width:${Math.max(3,p[1]/max*100)}%"></i></span><span class="rank-score">${p[1]} pt <span class="rank-chevron" aria-hidden="true">⌄</span></span></summary>${participantDetails(p)}</details>`).join("")}</div></section>`;
 }
 
@@ -307,6 +307,10 @@ function historyView(){
  }).join("")||`<div class="card empty">No completed days yet.</div>`}</div></section>`;
 }
 
+function miniStandingsView(){
+  const players=[...state.players].sort((a,b)=>b[1]-a[1]||b[2]-a[2]).slice(0,5);
+  return `<span class="eyebrow">Standings</span>${players.length?`<ol>${players.map((p,i)=>`<li><span class="mini-rank">${i+1}</span><span class="mini-player">${esc(p[0])}</span><strong>${p[1]}<small> pt</small></strong></li>`).join('')}</ol>`:'<p>No players yet.</p>'}<button type="button" data-tables-tab="standings" data-route="tables">Full standings <span aria-hidden="true">↗</span></button>`;
+}
 function render(){
   if(route==="standings"||route==="accuracy"){tablesTab=route;route="tables"}
   const allowed=["today","tables","history"]; if(!allowed.includes(route))route="today";
@@ -314,6 +318,7 @@ function render(){
   qs("#loadingExactPoints").textContent=`${scoringRules().exact}pt`;
   qs("#loadingBandPoints").textContent=`${scoringRules().band}pt`;
   document.querySelectorAll("[data-route]").forEach(b=>b.classList.toggle("active",b.dataset.route===route));
+  qs("#miniStandings").innerHTML=miniStandingsView();
   app.innerHTML=({today:todayView,tables:tablesView,history:historyView})[route]();
   if(route==="today"){liveClock();startWinnerSlide()}
   else{clearInterval(liveClock.timer);clearInterval(startWinnerSlide.timer)}

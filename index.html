@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=21">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="TotoWrap">
-  <link rel="stylesheet" href="style.css?v=20261006-adjustments-1">
+  <link rel="stylesheet" href="style.css?v=20261006-sidebar-1">
   <style>
     #loadingScreen{position:fixed;inset:0;z-index:100;background:#f4f7fd;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:30px;overflow-y:auto;font-family:system-ui,sans-serif;perspective:900px}
     #loadingScreen[hidden]{display:none!important}
@@ -91,11 +91,14 @@
       <button class="icon-btn" id="openAdmin" aria-label="Apri gestione" title="Gestione">⚙</button>
     </header>
 
+    <aside class="desktop-sidebar">
     <nav class="nav" aria-label="Main navigation">
       <button class="active" data-route="today"><span>◉</span>Today</button>
       <button data-route="tables"><span>◆</span>Boards</button>
       <button data-route="history"><span>↺</span>History</button>
     </nav>
+    <section class="mini-standings" aria-label="Mini standings" id="miniStandings"></section>
+    </aside>
 
     <main id="app" tabindex="-1"></main>
   </div>
@@ -206,6 +209,6 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261006-closest-format-1" onerror="window.totowrapLoadFailed()"></script>
+  <script type="module" src="app.js?v=20261006-sidebar-2" onerror="window.totowrapLoadFailed()"></script>
 </body>
 </html>
