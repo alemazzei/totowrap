@@ -40,7 +40,7 @@
   </style>
 </head>
 <body>
-<div id="loadingScreen" role="status"><div class="logo-flip loading-logo" role="img" aria-label="TotoWrap and GU3"><div class="logo-rotor" aria-hidden="true"><div class="logo-face logo-front"><img src="totowrap-logo.png" alt=""></div><div class="logo-face logo-back"><img src="gu3-logo.png" alt=""></div></div></div><ul class="loading-points" aria-label="Scoring"><li>Exact time <strong>3pt</strong></li><li>Time band <strong>1pt</strong></li></ul><p class="loading-quote" id="loadingQuote"></p></div>
+<div id="loadingScreen" role="status"><div class="logo-flip loading-logo" role="img" aria-label="TotoWrap and GU3"><div class="logo-rotor" aria-hidden="true"><div class="logo-face logo-front"><img src="totowrap-logo.png" alt=""></div><div class="logo-face logo-back"><img src="gu3-logo.png" alt=""></div></div></div><ul class="loading-points" aria-label="Scoring"><li>Exact time <strong id="loadingExactPoints">3pt</strong></li><li>Time band <strong id="loadingBandPoints">1pt</strong></li></ul><p class="loading-quote" id="loadingQuote"></p></div>
   <div id="connectionError" role="alert" hidden><p>Unable to load TotoWrap data. Check your connection and Firebase rules, then try again.</p><button type="button" onclick="location.reload()">Try again</button></div>
   <script>
     (()=>{
@@ -141,6 +141,16 @@
       </section>
 
       <section class="admin-page" data-admin-page="day">
+        <form id="scoringForm" class="recap-import">
+          <h3>Punteggi della singola giornata</h3>
+          <div class="time-inputs">
+            <label>Punti per orario esatto<input id="exactPointsInput" type="number" min="1" max="1000" step="1" value="3" required></label>
+            <label>Punti per fascia oraria<input id="bandPointsInput" type="number" min="1" max="1000" step="1" value="1" required></label>
+          </div>
+          <p class="field-note" id="scoringNote"></p>
+          <button type="submit" class="primary save-page">Salva punteggi della giornata</button>
+          <button type="button" class="secondary" id="resetScoringRules">Ripristina 3 e 1</button>
+        </form>
         <form id="dayForm">
           <label>Bet closing at · inizio riprese dal callsheet<input id="betClosingTimeInput" type="time" step="60"></label>
           <div class="time-inputs">
@@ -183,6 +193,6 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261002-countdown-2" onerror="window.totowrapLoadFailed()"></script>
+  <script type="module" src="app.js?v=20261006-day-rules-1" onerror="window.totowrapLoadFailed()"></script>
 </body>
 </html>

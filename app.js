@@ -22,6 +22,7 @@ const original = {
   estimatedTime: "",
   wrapTime: "",
   dayClosed: false,
+  scoringRules: {exact:3,band:1},
   betsPublished: false,
   betClosingTime: "",
   betClosingDate: "",
@@ -63,7 +64,20 @@ function bettingBands(players=state.players){
 }
 const bandFor = t => bettingBands().get(t);
 const inBand = (bet,wrap=state.wrapTime) => {const band=bandFor(bet),raw=toSec(wrap);if(!band||raw===null)return false;let adjusted=raw;while(adjusted<band.center-DAY_SEC/2)adjusted+=DAY_SEC;while(adjusted>band.center+DAY_SEC/2)adjusted-=DAY_SEC;return adjusted>=band.lower&&adjusted<=band.upper};
-const pointsFor = t => { if(!t||!state.wrapTime)return 0; if(t.slice(0,5)===state.wrapTime.slice(0,5))return 3; return inBand(t)?1:0; };
+const defaultScoringRules={exact:3,band:1};
+function scoringRules(value=state.scoringRules){
+  const valid=v=>Number.isInteger(v)&&v>=1&&v<=1000;
+  return {exact:valid(value?.exact)?value.exact:3,band:valid(value?.band)?value.band:1};
+}
+const winKindFor=t=>!t||!state.wrapTime?0:t.slice(0,5)===state.wrapTime.slice(0,5)?3:inBand(t)?1:0;
+const pointsFor=t=>{const kind=winKindFor(t),rules=scoringRules();return kind===3?rules.exact:kind===1?rules.band:0};
+function historicalWinKind(item,day){
+  if(item?.winKind===3||item?.winKind===1||item?.winKind===0)return item.winKind;
+  if(!item?.bet||!(Number(item.points)>0))return 0;
+  return day[3]&&item.bet.slice(0,5)===day[3].slice(0,5)?3:1;
+}
+const scoringLabel=rules=>`${rules.exact} pt for the exact minute · ${rules.band} pt for the time band`;
+
 const bandLabel = t => {const band=bandFor(t);return band?`${clock(band.lower)}–${clock(band.upper)}`:"—"};
 const award = points => points===3?'<span class="award" role="img" aria-label="Exact-minute win">🏆</span>':points===1?'<span class="award" role="img" aria-label="Time-band win">🥇</span>':"";
 function expiredBet(t,now=new Date()){
@@ -74,7 +88,7 @@ function expiredBet(t,now=new Date()){
   while(seconds>band.center+DAY_SEC/2)seconds-=DAY_SEC;
   return seconds>band.upper;
 }
-const status = t => { if(!t)return ["this bamboccione forgot to bet","none"];if(!state.wrapTime)return expiredBet(t)?["🫕 OUT","out"]:["IN","pending"];const pts=pointsFor(t); if(pts===3)return ["EXACT · 3 PT","win"]; if(pts===1)return ["BAND · 1 PT","close"]; return ["🫕 OUT","out"]; };
+const status = t => { if(!t)return ["this bamboccione forgot to bet","none"];if(!state.wrapTime)return expiredBet(t)?["🫕 OUT","out"]:["IN","pending"];const kind=winKindFor(t),pts=pointsFor(t); if(kind===3)return [`EXACT · ${pts} PT`,"win"]; if(kind===1)return [`BAND · ${pts} PT`,"close"]; return ["🫕 OUT","out"]; };
 function updateLiveBets(){
   document.querySelectorAll(".bet-row[data-bet]").forEach(row=>{const s=status(row.dataset.bet);row.classList.toggle("eliminated",s[1]==="out");const pill=row.querySelector(".pill");pill.className=`pill ${s[1]}`;pill.textContent=s[0]});
 }
@@ -157,14 +171,14 @@ function previousWinnerSlide(){
   const details=Array.isArray(previous[6])?previous[6]:[];
   const names=points>0?(details.length?details.filter(item=>Number(item.points)===points).map(item=>item.name):String(previous[1]||"").split(" · ").filter(Boolean)):[];
   const prefix=`<span class="winner-strip-label">winner day before · Day ${esc(previous[0])}</span> `;
-  const winners=names.length?names.map((name,i)=>`<span class="winner-item"${i?" hidden":""}>${prefix}${award(points)} ${esc(name)}</span>`).join(""):`<span class="winner-item">${prefix}No winner</span>`;
+  const winners=names.length?names.map((name,i)=>`<span class="winner-item"${i?" hidden":""}>${prefix}${award(details.length?historicalWinKind(details.find(item=>item.name===name),previous):points===scoringRules(previous[8]||defaultScoringRules).exact?3:1)} ${esc(name)}</span>`).join(""):`<span class="winner-item">${prefix}No winner</span>`;
   return `<aside class="winner-strip" aria-label="winner day before, day ${esc(previous[0])}"><div class="winner-viewport">${winners}</div></aside>`;
 }
 function currentWinnerCard(){
-  const scored=state.players.filter(p=>p[3]).map(p=>({name:p[0],points:pointsFor(p[3])}));
+  const scored=state.players.filter(p=>p[3]).map(p=>({name:p[0],points:pointsFor(p[3]),winKind:winKindFor(p[3])}));
   const best=Math.max(0,...scored.map(p=>p.points));
   const winners=scored.filter(p=>best>0&&p.points===best);
-  return `<article class="clock-card current-winner-card"><span class="eyebrow">Winner today · Day ${esc(state.day)}</span><strong class="current-winner-names">${winners.length?winners.map(p=>`<span>${award(p.points)} ${esc(p.name)}</span>`).join(""):'<span>No winner</span>'}</strong><span class="date">${best===3?"Exact time · 3 pt":best===1?"Time band · 1 pt":"No winning bets"}</span></article>`;
+  return `<article class="clock-card current-winner-card"><span class="eyebrow">Winner today · Day ${esc(state.day)}</span><strong class="current-winner-names">${winners.length?winners.map(p=>`<span>${award(p.winKind)} ${esc(p.name)}</span>`).join(""):'<span>No winner</span>'}</strong><span class="date">${winners.length?`${winners[0].winKind===3?"Exact time":"Time band"} · ${best} pt`:"No winning bets"}</span></article>`;
 }
 function startWinnerSlide(){
   clearInterval(startWinnerSlide.timer);
@@ -181,7 +195,7 @@ function startWinnerSlide(){
 }
 
 function todayView(){
-  if(!state.betsPublished)return `<section class="view"><div class="closing-layout"><article class="bet-closing"><span class="eyebrow">Bet closing at</span><strong id="closingTime">${esc(state.betClosingTime||"--:--")}</strong><div id="countdownBlock" class="closing-countdown" hidden><span>Time remaining</span><strong id="countdownClock" role="timer">--:--:--</strong></div><p>Ready to shoot · Day ${state.day}</p></article></div><div class="card awaiting-bets"><h1>Bets are still private</h1><p>They will appear here when the administrator clicks “Publish bets”.</p></div></section>`;
+  if(!state.betsPublished)return `<section class="view"><div class="closing-layout"><article class="bet-closing"><span class="eyebrow">Bet closing at</span><strong id="closingTime">${esc(state.betClosingTime||"--:--")}</strong><div id="countdownBlock" class="closing-countdown" hidden><span>Time remaining</span><strong id="countdownClock" role="timer">--:--:--</strong></div><p>Ready to shoot · Day ${state.day}</p><p>${scoringLabel(scoringRules())}</p></article></div><div class="card awaiting-bets"><h1>Bets are still private</h1><p>They will appear here when the administrator clicks “Publish bets”.</p></div></section>`;
   const withBets=state.players.filter(p=>p[3]);
   return `<section class="view"><div class="hero-grid">
     ${state.wrapTime?currentWinnerCard():`<article class="clock-card"><span class="eyebrow">Live Time</span><strong class="clock" id="liveClock">--:--:--</strong><span class="date" id="liveDate"></span><p class="next-elimination" id="firstBandCountdown" hidden><span>if we'll wrap before</span> <time id="firstBandTimer">--:--:--</time></p><p class="next-elimination" id="nextElimination" hidden><span>Next elimination</span> <strong id="nextEliminationName"></strong> in <time id="nextEliminationTimer">--:--:--</time></p></article>`}
@@ -191,8 +205,8 @@ function todayView(){
     </div>
   </div>${previousWinnerSlide()}<div class="section-head"><div><span class="eyebrow">Day ${state.day}</span><h1>${state.dayClosed?"Day results":"Today’s bets"}</h1></div><span class="count-label">${withBets.length} ${withBets.length===1?"bet placed":"bets placed"}</span></div>
   <div class="bet-list"><div class="bet-list-head"><span>Time</span><span>Player</span><span>Time band</span><span>Status</span></div>
-  <ol class="bets">${state.players.length?chronologicalPlayers(state.players).map(p=>{const s=status(p[3]),pts=pointsFor(p[3]);return `<li class="bet-row${p[3]?"":" no-bet"}${pts?" winner":""}${s[1]==="out"?" eliminated":""}" data-bet="${esc(p[3]||"")}"><time class="bet-time">${esc(p[3]||"—")}</time><div class="bet-person"><div class="avatar" aria-hidden="true">${esc(initials(p[0]))}</div><h3>${esc(p[0])} ${award(pts)}</h3></div><div class="bet-range">${p[3]?`<span class="mobile-range-label">Band </span>${bandLabel(p[3])}`:""}</div><span class="pill ${s[1]}">${s[0]}</span></li>`}).join(""):`<li class="empty">Add players in settings.</li>`}</ol></div>
-  <p class="bet-footnote">From earliest to latest. <span>3 points for the exact minute · 1 point for the time band.</span></p></section>`;
+  <ol class="bets">${state.players.length?chronologicalPlayers(state.players).map(p=>{const s=status(p[3]),pts=pointsFor(p[3]);return `<li class="bet-row${p[3]?"":" no-bet"}${pts?" winner":""}${s[1]==="out"?" eliminated":""}" data-bet="${esc(p[3]||"")}"><time class="bet-time">${esc(p[3]||"—")}</time><div class="bet-person"><div class="avatar" aria-hidden="true">${esc(initials(p[0]))}</div><h3>${esc(p[0])} ${award(winKindFor(p[3]))}</h3></div><div class="bet-range">${p[3]?`<span class="mobile-range-label">Band </span>${bandLabel(p[3])}`:""}</div><span class="pill ${s[1]}">${s[0]}</span></li>`}).join(""):`<li class="empty">Add players in settings.</li>`}</ol></div>
+  <p class="bet-footnote">From earliest to latest. <span>${scoringLabel(scoringRules())}.</span></p></section>`;
 }
 
 function betOffsetSeconds(bet,wrap){
@@ -220,7 +234,7 @@ function wrongBandDistance(item,day){
 function participantStats(player){
   const days=[...state.history].sort((a,b)=>b[0]-a[0]);
   const records=days.flatMap(day=>(Array.isArray(day[6])?day[6]:[]).filter(item=>item.name===player[0]).map(item=>({item,day})));
-  const exact=records.filter(r=>r.item.points===3).length;
+  const exact=records.filter(r=>historicalWinKind(r.item,r.day)===3).length;
   const wrong=records.map(r=>wrongBandDistance(r.item,r.day)).filter(v=>v!==null);
   const forgotten=days.filter(day=>Array.isArray(day[7])&&day[7].includes(player[0])&&!(day[6]||[]).some(item=>item.name===player[0]&&item.bet)).length;
   const previous=days[0],last=previous&&(previous[6]||[]).find(item=>item.name===player[0]);
@@ -284,10 +298,10 @@ return `<article class="card trend-card"><div class="trend-head"><div><span clas
 function historyView(){
  return `<section class="view"><div class="section-head"><div><span class="eyebrow">TotoWrap archive</span><h1>Day history</h1></div><p>Open a day to view all bets</p></div><div class="history-list">${state.history.map(h=>{
    const details=Array.isArray(h[6])?h[6]:[],winners=details.filter(item=>item.points>0);
-   const winnerMarkup=winners.length?winners.map(item=>`<span class="historical-winner">${esc(item.name)} ${award(item.points)}<small>Bet ${esc(item.bet)} · +${item.points} pt</small></span>`).join(""):h[4]>0?String(h[1]).split(" · ").map(name=>`<span class="historical-winner">${esc(name)} ${award(h[4])}<small>Bet ${esc(h[2])}</small></span>`).join(""):"No winner";
+   const winnerMarkup=winners.length?winners.map(item=>`<span class="historical-winner">${esc(item.name)} ${award(historicalWinKind(item,h))}<small>Bet ${esc(item.bet)} · +${item.points} pt</small></span>`).join(""):h[4]>0?String(h[1]).split(" · ").map(name=>`<span class="historical-winner">${esc(name)} ${award(Number(h[4])===scoringRules(h[8]||defaultScoringRules).exact?3:1)}<small>Bet ${esc(h[2])}</small></span>`).join(""):"No winner";
    const roster=Array.isArray(h[7])?h[7]:details.map(item=>item.name);
    const rows=[...details,...roster.filter(name=>!details.some(item=>item.name===name)).map(name=>({name,bet:null,points:0}))].sort((a,b)=>(toSec(a.bet)??Infinity)-(toSec(b.bet)??Infinity)||a.name.localeCompare(b.name,"en"));
-   return `<article class="card history-row"><button class="history-summary" aria-expanded="false"><span class="history-day">TotoWrap<br>Day ${esc(h[0])}</span><span class="history-winner">${winnerMarkup}</span><span class="history-official"><small>Wrap</small><strong>${esc(h[3])}</strong></span><span>⌄</span></button><div class="history-detail"><div class="history-meta"><span>Est. Wrap <strong>${esc(h[5]||"—")}</strong></span><span>Wrap <strong>${esc(h[3])}</strong></span></div><h3>All bets for the day</h3><ol class="history-bets">${rows.length?rows.map(item=>`<li class="history-bet${item.points>0?" winner":""}"><time>${esc(item.bet||"—")}</time><span class="history-bet-person">${esc(item.name)} ${award(item.points)}</span><span class="history-band">${esc(item.band||"")}</span><span class="pill ${!item.bet?"none":item.points===3?"win":item.points===1?"close":"out"}">${!item.bet?"Missed bet":item.points===3?"EXACT · 3 PT":item.points===1?"BAND · 1 PT":"🫕 OUT"}</span></li>`).join(""):`<li class="empty">Other bets are not available for this older day.</li>`}</ol></div></article>`;
+   return `<article class="card history-row"><button class="history-summary" aria-expanded="false"><span class="history-day">TotoWrap<br>Day ${esc(h[0])}</span><span class="history-winner">${winnerMarkup}</span><span class="history-official"><small>Wrap</small><strong>${esc(h[3])}</strong></span><span>⌄</span></button><div class="history-detail"><div class="history-meta"><span>Est. Wrap <strong>${esc(h[5]||"—")}</strong></span><span>Wrap <strong>${esc(h[3])}</strong></span></div><p class="field-note">${scoringLabel(scoringRules(h[8]||defaultScoringRules))}</p><h3>All bets for the day</h3><ol class="history-bets">${rows.length?rows.map(item=>`<li class="history-bet${item.points>0?" winner":""}"><time>${esc(item.bet||"—")}</time><span class="history-bet-person">${esc(item.name)} ${award(historicalWinKind(item,h))}</span><span class="history-band">${esc(item.band||"")}</span><span class="pill ${!item.bet?"none":historicalWinKind(item,h)===3?"win":historicalWinKind(item,h)===1?"close":"out"}">${!item.bet?"Missed bet":historicalWinKind(item,h)===3?`EXACT · ${item.points} PT`:historicalWinKind(item,h)===1?`BAND · ${item.points} PT`:"🫕 OUT"}</span></li>`).join(""):`<li class="empty">Other bets are not available for this older day.</li>`}</ol></div></article>`;
  }).join("")||`<div class="card empty">No completed days yet.</div>`}</div></section>`;
 }
 
@@ -295,6 +309,8 @@ function render(){
   if(route==="standings"||route==="accuracy"){tablesTab=route;route="tables"}
   const allowed=["today","tables","history"]; if(!allowed.includes(route))route="today";
   qs("#dayNumber").textContent=state.day;
+  qs("#loadingExactPoints").textContent=`${scoringRules().exact}pt`;
+  qs("#loadingBandPoints").textContent=`${scoringRules().band}pt`;
   document.querySelectorAll("[data-route]").forEach(b=>b.classList.toggle("active",b.dataset.route===route));
   app.innerHTML=({today:todayView,tables:tablesView,history:historyView})[route]();
   if(route==="today"){liveClock();startWinnerSlide()}
@@ -368,6 +384,9 @@ async function openAdminSettings(){
     try{const snapshot=await getDoc(DRAFT_REF),draft=snapshot.exists()?snapshot.data():null;privateBets=draft?.day===state.day?draft.bets||{}:{};draftDay=state.day}
     catch(error){console.error(error);return toast("Bet private non accessibili: aggiorna prima le regole Firebase")}
   }
+  qs("#exactPointsInput").value=scoringRules().exact;qs("#bandPointsInput").value=scoringRules().band;
+  document.querySelectorAll("#scoringForm input,#scoringForm button").forEach(el=>el.disabled=state.dayClosed);
+  qs("#scoringNote").textContent=state.dayClosed?"Giornata chiusa: i punteggi applicati sono conservati nello storico.":"Valide solo per questa giornata. Il giorno successivo tornano automaticamente a 3 e 1. Salva prima di chiudere la giornata.";
   refreshPlayers();setAdminTab("bets");dialog.showModal();
 }
 function enteredBets(){return [...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}))}
@@ -389,6 +408,16 @@ qs("#openAdmin").addEventListener("click",()=>{if(!isAdmin){loginDialog.showModa
 qs("#closeAdmin").addEventListener("click",()=>dialog.close());
 document.querySelectorAll("[data-admin-tab]").forEach(button=>button.addEventListener("click",()=>setAdminTab(button.dataset.adminTab)));
 betsForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");if(!state.betsPublished){if(await savePrivateBets()){toast("Bet salvate in privato");dialog.close()}return}const bets=[...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}));if(await mutateAndSave(()=>bets.forEach(item=>{if(state.players[item.index])state.players[item.index][3]=item.time}),"Tutte le bet sono state salvate"))dialog.close()});
+qs("#scoringForm").addEventListener("submit",async e=>{
+  e.preventDefault();if(!isAdmin||state.dayClosed)return;
+  const exact=Number(qs("#exactPointsInput").value),band=Number(qs("#bandPointsInput").value);
+  if(![exact,band].every(v=>Number.isInteger(v)&&v>=1&&v<=1000))return toast("Inserisci punteggi interi da 1 a 1000");
+  await mutateAndSave(()=>state.scoringRules={exact,band},`Punteggi giorno ${state.day} salvati: esatto ${exact}, fascia ${band}`);
+});
+qs("#resetScoringRules").addEventListener("click",async()=>{
+  if(!isAdmin||state.dayClosed)return;
+  if(await mutateAndSave(()=>state.scoringRules={...defaultScoringRules},"Punteggi standard ripristinati: 3 e 1")){qs("#exactPointsInput").value=3;qs("#bandPointsInput").value=1}
+});
 dayForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const estimated=qs("#estimatedTimeInput").value,closing=qs("#betClosingTimeInput").value;if(await mutateAndSave(()=>{state.estimatedTime=estimated;state.betClosingDate=closing?(closing===state.betClosingTime&&state.betClosingDate||romeDate(new Date())):"";state.betClosingTime=closing},"Orari della giornata salvati"))dialog.close()});
 qs("#addPlayer").addEventListener("click",async()=>{if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const input=qs("#newPlayerInput"),name=input.value.trim();if(!name)return toast("Inserisci un nome");if(state.players.some(p=>p[0].toLowerCase()===name.toLowerCase()))return toast("Partecipante già presente");if(await mutateAndSave(()=>state.players.push([name,0,0,null,0,0]),`${name} aggiunto`)){input.value="";refreshPlayers(state.players.length-1)}});
 qs("#removePlayer").addEventListener("click",async()=>{if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");if(playerInput.value==="")return;const idx=+playerInput.value,name=state.players[idx][0];if(!confirm(`Rimuovere ${name}?`))return;if(await mutateAndSave(()=>state.players.splice(idx,1),`${name} rimosso`))refreshPlayers(Math.max(0,idx-1))});
@@ -407,14 +436,14 @@ async function closeDayAt(wrap,successMessage){
     state.players.forEach(p=>{
       if(!p[3])return;
       const pts=pointsFor(p[3]),distance=diff(p[3]);
-      dayDetails.push({name:p[0],bet:p[3],errorMin:distance,points:pts,band:bandLabel(p[3]),bandBounds:bandFor(p[3])});
+      dayDetails.push({name:p[0],bet:p[3],errorMin:distance,points:pts,winKind:winKindFor(p[3]),band:bandLabel(p[3]),bandBounds:bandFor(p[3])});
       p[1]+=pts;
       if(pts>0){p[2]+=1;scorers.push([p[0],p[3],pts])}
       p[4]=((p[4]*p[5])+distance)/(p[5]+1);
       p[5]+=1;
     });
     const best=Math.max(0,...scorers.map(s=>s[2])),winners=scorers.filter(s=>s[2]===best);
-    state.history.unshift([state.day,winners.length?winners.map(w=>w[0]).join(" · "):"Nessun vincitore",winners.length?winners.map(w=>w[1]).join(" · "):"—",wrap,best,estimated,dayDetails,state.players.map(p=>p[0])]);
+    state.history.unshift([state.day,winners.length?winners.map(w=>w[0]).join(" · "):"Nessun vincitore",winners.length?winners.map(w=>w[1]).join(" · "):"—",wrap,best,estimated,dayDetails,state.players.map(p=>p[0]),scoringRules()]);
     state.dayClosed=true;
   },successMessage);
   if(saved){dialog.close();route="today";location.hash=route;render()}
@@ -429,10 +458,11 @@ function correctClosedWrap(wrap){
   const newDetails=oldDetails.map(item=>{
     const band=bands.get(item.bet),raw=toSec(wrap);let adjusted=raw;
     if(band){while(adjusted<band.center-DAY_SEC/2)adjusted+=DAY_SEC;while(adjusted>band.center+DAY_SEC/2)adjusted-=DAY_SEC}
-    const points=item.bet.slice(0,5)===wrap.slice(0,5)?3:band&&adjusted>=band.lower&&adjusted<=band.upper?1:0;
+    const winKind=item.bet.slice(0,5)===wrap.slice(0,5)?3:band&&adjusted>=band.lower&&adjusted<=band.upper?1:0;
+    const rules=scoringRules(previous[8]||defaultScoringRules),points=winKind===3?rules.exact:winKind===1?rules.band:0;
     const distance=Math.abs(betOffsetSeconds(item.bet,wrap))/60;
     const errorMin=Math.round(distance*10)/10;
-    return {...item,points,errorMin};
+    return {...item,points,errorMin,winKind};
   });
   state.players.forEach(player=>{
     const old=oldDetails.find(item=>item.name===player[0]),updated=newDetails.find(item=>item.name===player[0]);
@@ -442,7 +472,7 @@ function correctClosedWrap(wrap){
     if(player[5]>0)player[4]=Math.max(0,(player[4]*player[5]-old.errorMin+updated.errorMin)/player[5]);
   });
   const best=Math.max(0,...newDetails.map(item=>item.points)),winners=newDetails.filter(item=>best>0&&item.points===best);
-  state.history[index]=[previous[0],winners.length?winners.map(item=>item.name).join(" · "):"Nessun vincitore",winners.length?winners.map(item=>item.bet).join(" · "):"—",wrap,best,previous[5],newDetails,previous[7]];
+  state.history[index]=[previous[0],winners.length?winners.map(item=>item.name).join(" · "):"Nessun vincitore",winners.length?winners.map(item=>item.bet).join(" · "):"—",wrap,best,previous[5],newDetails,previous[7],scoringRules(previous[8]||defaultScoringRules)];
   state.wrapTime=wrap;
 }
 qs("#correctWrap").addEventListener("click",async()=>{
@@ -460,7 +490,7 @@ qs("#wrapNow").addEventListener("click",async()=>{
   await closeDayAt(exact,`Wrap ${exact}: punti assegnati`);
 });
 qs("#finalizeDay").addEventListener("click",()=>closeDayAt(qs("#wrapTimeInput").value,"Punti assegnati e giornata chiusa"));
-qs("#advanceDay").addEventListener("click",async()=>{const nextDay=state.day+1;if(!confirm(state.dayClosed?`Avviare il giorno ${nextDay}? I risultati del giorno ${state.day} resteranno nello storico.`:`Passare al giorno ${nextDay} senza assegnare punti? Le bet e gli orari della giornata ${state.day} verranno cancellati.`))return;const saved=await mutateAndSave(()=>{state.day=nextDay;state.betsPublished=false;state.betClosingTime="";state.betClosingDate="";privateBets={};draftDay=null;state.dayClosed=false;state.estimatedTime="";state.wrapTime="";state.players.forEach(p=>p[3]=null)},`Giorno ${nextDay} avviato`);if(saved){dialog.close();route="today";location.hash=route;render()}});
+qs("#advanceDay").addEventListener("click",async()=>{const nextDay=state.day+1;if(!confirm(state.dayClosed?`Avviare il giorno ${nextDay}? I risultati del giorno ${state.day} resteranno nello storico.`:`Passare al giorno ${nextDay} senza assegnare punti? Le bet e gli orari della giornata ${state.day} verranno cancellati.`))return;const saved=await mutateAndSave(()=>{state.day=nextDay;state.scoringRules={...defaultScoringRules};state.betsPublished=false;state.betClosingTime="";state.betClosingDate="";privateBets={};draftDay=null;state.dayClosed=false;state.estimatedTime="";state.wrapTime="";state.players.forEach(p=>p[3]=null)},`Giorno ${nextDay} avviato`);if(saved){dialog.close();route="today";location.hash=route;render()}});
 qs("#resetDemo").addEventListener("click",async()=>{if(!confirm("Azzerare partecipanti, classifica, precisione e storico?"))return;try{await deleteDoc(DRAFT_REF)}catch(error){return toast("Reset non riuscito: controlla le regole Firebase")}privateBets={};draftDay=null;if(await mutateAndSave(()=>state=clone(original),"TotoWrap azzerato: si riparte dal giorno 1"))dialog.close()});
 loginForm.addEventListener("submit",async e=>{e.preventDefault();const button=loginForm.querySelector("button[type=submit]");button.disabled=true;button.textContent="Accesso…";try{const credential=await signInWithEmailAndPassword(auth,qs("#loginEmail").value.trim(),qs("#loginPassword").value);if(credential.user.uid!==ADMIN_UID){await signOut(auth);throw new Error("Utente non autorizzato")}qs("#loginPassword").value="";loginDialog.close();await openAdminSettings();toast("Accesso amministratore effettuato")}catch(error){console.error(error);toast("Email o password non corretti")}finally{button.disabled=false;button.textContent="Accedi"}});
 qs("#closeLogin").addEventListener("click",()=>loginDialog.close());
