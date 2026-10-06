@@ -244,9 +244,10 @@ function participantStats(player){
   const incomplete=days.some(day=>!Array.isArray(day[7]));
   return {exact,forgotten,closest:wrong.length?Math.min(...wrong):null,lastLabel,incomplete};
 }
+const formatClosestWrongBet=seconds=>seconds===null?"—":seconds<60?`${seconds}s`:`${Math.floor(seconds/60)}m${seconds%60?` ${seconds%60}s`:""}`;
 function participantDetails(player){
   const s=participantStats(player);
-return `<div class="participant-detail"><p class="last-bet">${esc(s.lastLabel)}</p><div class="participant-metrics"><div><strong>${player[2]}</strong><span>Total wins</span></div><div><strong>${s.exact}</strong><span>Exact wins</span></div><div><strong>${s.forgotten}</strong><span>Missed bets</span></div><div><strong>${s.closest===null?"—":`${s.closest}s`}</strong><span>Closest wrong bet</span></div></div><p class="field-note">Closest wrong bet: seconds from the wrap to the nearest time-band boundary, for losing bets only.${s.incomplete?" Missed bets are only counted for days with a saved player roster; older absences cannot be reconstructed.":""}</p></div>`;
+return `<div class="participant-detail"><p class="last-bet">${esc(s.lastLabel)}</p><div class="participant-metrics"><div><strong>${player[2]}</strong><span>Total wins</span></div><div><strong>${s.exact}</strong><span>Exact wins</span></div><div><strong>${s.forgotten}</strong><span>Missed bets</span></div><div><strong>${formatClosestWrongBet(s.closest)}</strong><span>Closest wrong bet</span></div></div><p class="field-note">Closest wrong bet: distance from the wrap to the nearest time-band boundary, for losing bets only.${s.incomplete?" Missed bets are only counted for days with a saved player roster; older absences cannot be reconstructed.":""}</p></div>`;
 }
 function tablesView(){
   return `<div class="tables-view"><div class="tables-tabs" role="group" aria-label="Board sections"><button data-tables-tab="standings" class="${tablesTab==="standings"?"active":""}" aria-pressed="${tablesTab==="standings"}">Standings</button><button data-tables-tab="accuracy" class="${tablesTab==="accuracy"?"active":""}" aria-pressed="${tablesTab==="accuracy"}">Accuracy</button></div>${tablesTab==="accuracy"?accuracyView():standingsView()}</div>`;
