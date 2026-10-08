@@ -160,3 +160,10 @@ body{background:radial-gradient(circle at 90% -10%,rgba(85,168,255,.17),transpar
  #app{grid-column:2;grid-row:2;min-width:0}.desktop-sidebar+.view{min-width:0}
  .bet-list-head,.bet-row{grid-template-columns:90px minmax(100px,1fr) minmax(140px,1fr) 125px;gap:12px}
 }
+
+/* Current-day crown bonus */
+.crown-options {display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;max-height:300px;overflow-y:auto;padding:4px;}
+.crown-option {display:flex!important;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--panel2);}
+.crown-option input {width:20px;height:20px;flex:0 0 20px;accent-color:var(--blue);}
+.crown {white-space:nowrap;}
+.current-winner-names small {font-size:.5em;white-space:nowrap;}

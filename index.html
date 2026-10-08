@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=21">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="TotoWrap">
-  <link rel="stylesheet" href="style.css?v=20261006-sidebar-1">
+  <link rel="stylesheet" href="style.css?v=20261008-crown-1">
   <style>
     #loadingScreen{position:fixed;inset:0;z-index:100;background:#f4f7fd;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:30px;overflow-y:auto;font-family:system-ui,sans-serif;perspective:900px}
     #loadingScreen[hidden]{display:none!important}
@@ -176,6 +176,13 @@
         <button type="button" class="reset-all" id="resetDemo">Azzera completamente TotoWrap</button>
       </section>
       <section class="admin-page" data-admin-page="points">
+        <form id="crownForm" class="recap-import">
+          <h3>👑 Regola della corona</h3>
+          <p class="field-note">Chi ha la corona gioca con la propria bet e con gli orari distinti immediatamente precedente e successivo. Copre le loro fasce e riceve il punteggio esatto anche se il wrap cade nel minuto di una bet adiacente. Agli estremi si usa solo il vicino disponibile. Senza bet il bonus non assegna punti.</p>
+          <div id="crownPlayers" class="crown-options"></div>
+          <p id="crownNote" class="field-note"></p>
+          <button type="submit" class="primary save-page" id="saveCrowns">Salva corone della giornata</button>
+        </form>
         <form id="pointAdjustmentForm">
           <h3>Correggi punti</h3>
           <label>Giocatore<select id="adjustPlayer"></select></label>
@@ -209,6 +216,6 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261006-sidebar-2" onerror="window.totowrapLoadFailed()"></script>
+  <script type="module" src="app.js?v=20261008-crown-1" onerror="window.totowrapLoadFailed()"></script>
 </body>
 </html>
