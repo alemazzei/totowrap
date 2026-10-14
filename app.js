@@ -26,6 +26,8 @@ const original = {
   betsPublished: false,
   betClosingTime: "",
   betClosingDate: "",
+  pushDayDate: "",
+  pushRound: 0,
   players: [],
   pointAdjustments: [],
   crownPlayers: [],
@@ -367,6 +369,9 @@ function refreshPlayers(selected=0){
   refreshPointAdjustments();
   refreshCrowns();
   qs("#correctWrap").hidden=!state.dayClosed;
+  qs("#reopenDay").hidden=!state.dayClosed;
+  qs("#wrapNow").disabled=state.dayClosed;
+  qs("#finalizeDay").disabled=state.dayClosed;
   qs("#saveBets").textContent=state.betsPublished?"Salva modifiche alle bet pubblicate":"Salva bet private";
   qs("#publishBets").hidden=state.betsPublished;
   playerInput.innerHTML=state.players.length?state.players.map((p,i)=>`<option value="${i}">${esc(p[0])}</option>`).join(""):`<option value="">Nessun partecipante</option>`;
@@ -459,7 +464,7 @@ qs('#pointAdjustmentsLog').addEventListener('click',async e=>{
   if(await mutateAndSave(()=>cancelPointAdjustment(item.id),'Correzione punti annullata'))refreshPointAdjustments();else button.disabled=false;
 });
 
-async function mutateAndSave(mutator,success){const before=clone(state);mutator();try{await persist();render();toast(success);return true}catch(error){state=before;render();console.error(error);toast("Salvataggio non riuscito: riprova");return false}}
+async function mutateAndSave(mutator,success){const before=clone(state);try{mutator();await persist();render();toast(success);return true}catch(error){state=before;render();console.error(error);toast("Salvataggio non riuscito: riprova");return false}}
 async function openAdminSettings(){
   if(!isAdmin)return;
   qs("#estimatedTimeInput").value=state.estimatedTime;qs("#wrapTimeInput").value=state.wrapTime;qs("#betClosingTimeInput").value=state.betClosingTime;
@@ -468,8 +473,8 @@ async function openAdminSettings(){
     catch(error){console.error(error);return toast("Bet private non accessibili: aggiorna prima le regole Firebase")}
   }
   qs("#exactPointsInput").value=scoringRules().exact;qs("#bandPointsInput").value=scoringRules().band;
-  document.querySelectorAll("#scoringForm input,#scoringForm button").forEach(el=>el.disabled=state.dayClosed);
-  qs("#scoringNote").textContent=state.dayClosed?"Giornata chiusa: i punteggi applicati sono conservati nello storico.":"Valide solo per questa giornata. Il giorno successivo tornano automaticamente a 3 e 1. Salva prima di chiudere la giornata.";
+  qs("#saveDayScoring").textContent=state.dayClosed?"Correggi punteggi e ricalcola la giornata":"Salva punteggi della giornata";
+  qs("#scoringNote").textContent=state.dayClosed?"Puoi correggere i punti per esatto e fascia: classifica e storico saranno ricalcolati per questa giornata. I bonus e malus manuali restano invariati.":"Valide solo per questa giornata. Il giorno successivo tornano automaticamente a 3 e 1. Salva prima di chiudere la giornata.";
   refreshPlayers();setAdminTab("bets");dialog.showModal();
 }
 function enteredBets(){return [...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}))}
@@ -485,22 +490,29 @@ qs("#publishBets").addEventListener("click",async()=>{
   if(!enteredBets().some(item=>item.time))return toast("Inserisci almeno una bet");
   if(!confirm("Pubblicare tutte le bet e rendere visibili gli orari a tutti?"))return;
   const button=qs("#publishBets");button.disabled=true;
-  try{if(!await savePrivateBets())return;if(await mutateAndSave(()=>{state.players.forEach(p=>p[3]=privateBets[p[0]]||null);state.betsPublished=true},"Bet pubblicate per tutti"))dialog.close()}finally{button.disabled=false}
+  try{if(!await savePrivateBets())return;if(await mutateAndSave(()=>{state.players.forEach(p=>p[3]=privateBets[p[0]]||null);state.pushDayDate=state.pushDayDate||state.betClosingDate||romeDate(new Date());state.betsPublished=true},"Bet pubblicate per tutti"))dialog.close()}finally{button.disabled=false}
 });
 qs("#openAdmin").addEventListener("click",()=>{if(!isAdmin){loginDialog.showModal();return}openAdminSettings()});
 qs("#closeAdmin").addEventListener("click",()=>dialog.close());
 document.querySelectorAll("[data-admin-tab]").forEach(button=>button.addEventListener("click",()=>setAdminTab(button.dataset.adminTab)));
 betsForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");if(!state.betsPublished){if(await savePrivateBets()){toast("Bet salvate in privato");dialog.close()}return}const bets=[...document.querySelectorAll("[data-bet-index]")].map(input=>({index:+input.dataset.betIndex,time:input.value||null}));if(await mutateAndSave(()=>bets.forEach(item=>{if(state.players[item.index])state.players[item.index][3]=item.time}),"Tutte le bet sono state salvate"))dialog.close()});
+function setDayScoringRules(rules){
+  if(![rules.exact,rules.band].every(v=>Number.isInteger(v)&&v>=1&&v<=1000))throw new Error("Punteggi non validi");
+  if(state.dayClosed)correctClosedWrap(state.wrapTime,rules);
+  state.scoringRules={...rules};
+}
+async function saveDayScoring(rules){
+  if(!isAdmin)return;
+  if(![rules.exact,rules.band].every(v=>Number.isInteger(v)&&v>=1&&v<=1000))return toast("Inserisci punteggi interi da 1 a 1000");
+  if(state.dayClosed&&!confirm(`Correggere i punteggi del giorno ${state.day}: esatto ${rules.exact} pt, fascia ${rules.band} pt? Classifica e storico saranno aggiornati; bonus e malus manuali resteranno invariati.`))return;
+  if(await mutateAndSave(()=>setDayScoringRules(rules),`Punteggi giorno ${state.day} aggiornati: esatto ${rules.exact}, fascia ${rules.band}`)){
+    qs("#exactPointsInput").value=rules.exact;qs("#bandPointsInput").value=rules.band;
+  }
+}
 qs("#scoringForm").addEventListener("submit",async e=>{
-  e.preventDefault();if(!isAdmin||state.dayClosed)return;
-  const exact=Number(qs("#exactPointsInput").value),band=Number(qs("#bandPointsInput").value);
-  if(![exact,band].every(v=>Number.isInteger(v)&&v>=1&&v<=1000))return toast("Inserisci punteggi interi da 1 a 1000");
-  await mutateAndSave(()=>state.scoringRules={exact,band},`Punteggi giorno ${state.day} salvati: esatto ${exact}, fascia ${band}`);
+  e.preventDefault();await saveDayScoring({exact:Number(qs("#exactPointsInput").value),band:Number(qs("#bandPointsInput").value)});
 });
-qs("#resetScoringRules").addEventListener("click",async()=>{
-  if(!isAdmin||state.dayClosed)return;
-  if(await mutateAndSave(()=>state.scoringRules={...defaultScoringRules},"Punteggi standard ripristinati: 3 e 1")){qs("#exactPointsInput").value=3;qs("#bandPointsInput").value=1}
-});
+qs("#resetScoringRules").addEventListener("click",()=>saveDayScoring({...defaultScoringRules}));
 dayForm.addEventListener("submit",async e=>{e.preventDefault();if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const estimated=qs("#estimatedTimeInput").value,closing=qs("#betClosingTimeInput").value;if(await mutateAndSave(()=>{state.estimatedTime=estimated;state.betClosingDate=closing?(closing===state.betClosingTime&&state.betClosingDate||romeDate(new Date())):"";state.betClosingTime=closing},"Orari della giornata salvati"))dialog.close()});
 qs("#addPlayer").addEventListener("click",async()=>{if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");const input=qs("#newPlayerInput"),name=input.value.trim();if(!name)return toast("Inserisci un nome");if(state.players.some(p=>p[0].toLowerCase()===name.toLowerCase()))return toast("Partecipante già presente");if(await mutateAndSave(()=>state.players.push([name,0,0,null,0,0]),`${name} aggiunto`)){input.value="";refreshPlayers(state.players.length-1)}});
 qs("#removePlayer").addEventListener("click",async()=>{if(state.dayClosed)return toast("Giornata chiusa: avvia prima il giorno successivo");if(playerInput.value==="")return;const idx=+playerInput.value,name=state.players[idx][0];if(!confirm(`Rimuovere ${name}?`))return;if(await mutateAndSave(()=>state.players.splice(idx,1),`${name} rimosso`))refreshPlayers(Math.max(0,idx-1))});
@@ -531,7 +543,7 @@ async function closeDayAt(wrap,successMessage){
   },successMessage);
   if(saved){dialog.close();route="today";location.hash=route;render()}
 }
-function correctClosedWrap(wrap){
+function correctClosedWrap(wrap,newRules){
   const index=state.history.findIndex(day=>Number(day[0])===Number(state.day));
   const previous=state.history[index];
   if(!state.dayClosed||!previous||!Array.isArray(previous[6]))throw new Error("Dati della giornata non disponibili per la correzione");
@@ -540,7 +552,7 @@ function correctClosedWrap(wrap){
   const crowns=Array.isArray(previous[9])?previous[9]:oldDetails.filter(item=>item.crowned).map(item=>item.name);
   const newDetails=oldDetails.map(item=>{
     const winKind=winningKind(item.bet,item.name,wrap,dayPlayers,crowns);
-    const rules=scoringRules(previous[8]||defaultScoringRules),points=winKind===3?rules.exact:winKind===1?rules.band:0;
+    const rules=scoringRules(newRules||previous[8]||defaultScoringRules),points=winKind===3?rules.exact:winKind===1?rules.band:0;
     const distance=Math.abs(betOffsetSeconds(item.bet,wrap))/60;
     const errorMin=Math.round(distance*10)/10;
     return {...item,points,errorMin,winKind};
@@ -553,9 +565,38 @@ function correctClosedWrap(wrap){
     if(player[5]>0)player[4]=Math.max(0,(player[4]*player[5]-old.errorMin+updated.errorMin)/player[5]);
   });
   const best=Math.max(0,...newDetails.map(item=>item.points)),winners=newDetails.filter(item=>item.points>0);
-  state.history[index]=[previous[0],winners.length?winners.map(item=>item.name).join(" · "):"Nessun vincitore",winners.length?winners.map(item=>item.bet).join(" · "):"—",wrap,best,previous[5],newDetails,previous[7],scoringRules(previous[8]||defaultScoringRules),crowns];
+  state.history[index]=[previous[0],winners.length?winners.map(item=>item.name).join(" · "):"Nessun vincitore",winners.length?winners.map(item=>item.bet).join(" · "):"—",wrap,best,previous[5],newDetails,previous[7],scoringRules(newRules||previous[8]||defaultScoringRules),crowns];
   state.wrapTime=wrap;
 }
+function reopenCurrentDay(){
+  const index=state.history.findIndex(day=>Number(day[0])===Number(state.day)),day=state.history[index];
+  if(!state.dayClosed||!day||!Array.isArray(day[6]))throw new Error("Dati della giornata non disponibili per la riapertura");
+  if(state.history.filter(h=>Number(h[0])===Number(state.day)).length!==1)throw new Error("Storico duplicato: impossibile riaprire in sicurezza");
+  const details=day[6];
+  for(const item of details){
+    const player=state.players.find(p=>p[0]===item.name);
+    if(player&&(!Number.isFinite(Number(item.points))||!Number.isFinite(Number(item.errorMin))||!(player[5]>=1)))throw new Error("Statistiche incomplete: impossibile riaprire in sicurezza");
+  }
+  for(const player of state.players){
+    const item=details.find(item=>item.name===player[0]);if(!item)continue;
+    const count=player[5],remaining=count-1;
+    player[1]-=Number(item.points);
+    player[2]=Math.max(0,player[2]-Number(item.points>0));
+    player[4]=remaining?Math.max(0,(player[4]*count-Number(item.errorMin))/remaining):0;
+    player[5]=remaining;
+    player[3]=item.bet;
+  }
+  state.scoringRules=scoringRules(day[8]||defaultScoringRules);
+  state.crownPlayers=Array.isArray(day[9])?[...day[9]]:details.filter(item=>item.crowned).map(item=>item.name);
+  state.history.splice(index,1);
+  state.wrapTime="";state.dayClosed=false;state.betsPublished=true;
+  state.pushRound=(Number(state.pushRound)||0)+1;
+}
+qs("#reopenDay").addEventListener("click",async()=>{
+  if(!isAdmin||!state.dayClosed)return;
+  if(!confirm(`Riaprire il giorno ${state.day}? Saranno annullati punti, vittorie e statistiche assegnati da questa chiusura. Le bet, le corone e i bonus/malus manuali resteranno disponibili. Il live time ripartirà dall'ora attuale.`))return;
+  if(await mutateAndSave(reopenCurrentDay,"Giornata riaperta: live time ripristinato")){qs("#wrapTimeInput").value="";dialog.close();route="today";location.hash=route;render()}
+});
 qs("#correctWrap").addEventListener("click",async()=>{
   if(!isAdmin||!state.dayClosed)return;
   const wrap=qs("#wrapTimeInput").value;
@@ -571,7 +612,7 @@ qs("#wrapNow").addEventListener("click",async()=>{
   await closeDayAt(exact,`Wrap ${exact}: punti assegnati`);
 });
 qs("#finalizeDay").addEventListener("click",()=>closeDayAt(qs("#wrapTimeInput").value,"Punti assegnati e giornata chiusa"));
-qs("#advanceDay").addEventListener("click",async()=>{const nextDay=state.day+1;if(!confirm(state.dayClosed?`Avviare il giorno ${nextDay}? I risultati del giorno ${state.day} resteranno nello storico.`:`Passare al giorno ${nextDay} senza assegnare punti? Le bet e gli orari della giornata ${state.day} verranno cancellati.`))return;const saved=await mutateAndSave(()=>{state.day=nextDay;state.crownPlayers=[];state.scoringRules={...defaultScoringRules};state.betsPublished=false;state.betClosingTime="";state.betClosingDate="";privateBets={};draftDay=null;state.dayClosed=false;state.estimatedTime="";state.wrapTime="";state.players.forEach(p=>p[3]=null)},`Giorno ${nextDay} avviato`);if(saved){dialog.close();route="today";location.hash=route;render()}});
+qs("#advanceDay").addEventListener("click",async()=>{const nextDay=state.day+1;if(!confirm(state.dayClosed?`Avviare il giorno ${nextDay}? I risultati del giorno ${state.day} resteranno nello storico.`:`Passare al giorno ${nextDay} senza assegnare punti? Le bet e gli orari della giornata ${state.day} verranno cancellati.`))return;const saved=await mutateAndSave(()=>{state.day=nextDay;state.pushRound=0;state.pushDayDate=romeDate(new Date());state.crownPlayers=[];state.scoringRules={...defaultScoringRules};state.betsPublished=false;state.betClosingTime="";state.betClosingDate="";privateBets={};draftDay=null;state.dayClosed=false;state.estimatedTime="";state.wrapTime="";state.players.forEach(p=>p[3]=null)},`Giorno ${nextDay} avviato`);if(saved){dialog.close();route="today";location.hash=route;render()}});
 qs("#resetDemo").addEventListener("click",async()=>{if(!confirm("Azzerare partecipanti, classifica, precisione e storico?"))return;try{await deleteDoc(DRAFT_REF)}catch(error){return toast("Reset non riuscito: controlla le regole Firebase")}privateBets={};draftDay=null;if(await mutateAndSave(()=>state=clone(original),"TotoWrap azzerato: si riparte dal giorno 1"))dialog.close()});
 loginForm.addEventListener("submit",async e=>{e.preventDefault();const button=loginForm.querySelector("button[type=submit]");button.disabled=true;button.textContent="Accesso…";try{const credential=await signInWithEmailAndPassword(auth,qs("#loginEmail").value.trim(),qs("#loginPassword").value);if(credential.user.uid!==ADMIN_UID){await signOut(auth);throw new Error("Utente non autorizzato")}qs("#loginPassword").value="";loginDialog.close();await openAdminSettings();toast("Accesso amministratore effettuato")}catch(error){console.error(error);toast("Email o password non corretti")}finally{button.disabled=false;button.textContent="Accedi"}});
 qs("#closeLogin").addEventListener("click",()=>loginDialog.close());
@@ -596,3 +637,6 @@ if(document.modelContext?.registerTool){
   document.modelContext.registerTool({name:"open_totowrap_section",title:"Open TotoWrap section",description:"Opens a website section: today, standings, accuracy or history.",inputSchema:{type:"object",properties:{section:{type:"string",enum:["today","standings","accuracy","history"]}},required:["section"],additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:false},execute:({section})=>{route=section;location.hash=section;render();return{section}}});
 }
 render();
+
+// Load push separately so deployment/configuration errors cannot block gameplay.
+import('./notifications.js?v=20261013-push-1').then(({setupNotifications})=>setupNotifications({firebaseApp,toast,isAdmin:()=>isAdmin})).catch(error=>console.warn('Notifications module unavailable',error.name));

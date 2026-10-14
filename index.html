@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=21">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="TotoWrap">
-  <link rel="stylesheet" href="style.css?v=20261008-crown-1">
+  <link rel="stylesheet" href="style.css?v=20261014-reopen-1">
   <style>
     #loadingScreen{position:fixed;inset:0;z-index:100;background:#f4f7fd;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:30px;overflow-y:auto;font-family:system-ui,sans-serif;perspective:900px}
     #loadingScreen[hidden]{display:none!important}
@@ -88,6 +88,7 @@
         <span class="logo-flip header-logo" role="img" aria-label="TotoWrap and GU3"><span class="logo-rotor" aria-hidden="true"><span class="logo-face logo-front"><img src="totowrap-logo.png" alt=""></span><span class="logo-face logo-back"><img src="gu3-logo.png" alt=""></span></span></span>
       </button>
       <div class="day-chip"><span>Day</span><strong id="dayNumber">1</strong></div>
+      <button class="icon-btn" id="openNotifications" aria-label="Enable notifications" title="Notifications">🔔</button>
       <button class="icon-btn" id="openAdmin" aria-label="Apri gestione" title="Gestione">⚙</button>
     </header>
 
@@ -114,6 +115,7 @@
         <button type="button" class="active" data-admin-tab="bets" role="tab">Partecipanti e bet</button>
         <button type="button" data-admin-tab="day" role="tab">Wrap e giornata</button>
         <button type="button" data-admin-tab="points" role="tab">Bonus e malus</button>
+        <button type="button" data-admin-tab="push" role="tab">Notifiche</button>
       </div>
 
       <section class="admin-page active" data-admin-page="bets">
@@ -152,7 +154,7 @@
             <label>Punti per fascia oraria<input id="bandPointsInput" type="number" min="1" max="1000" step="1" value="1" required></label>
           </div>
           <p class="field-note" id="scoringNote"></p>
-          <button type="submit" class="primary save-page">Salva punteggi della giornata</button>
+          <button type="submit" class="primary save-page" id="saveDayScoring">Salva punteggi della giornata</button>
           <button type="button" class="secondary" id="resetScoringRules">Ripristina 3 e 1</button>
         </form>
         <form id="dayForm">
@@ -172,6 +174,8 @@
         <button type="button" class="finalize" id="finalizeDay">Chiudi usando il wrap inserito manualmente</button>
         <button type="button" class="finalize" id="correctWrap" hidden>Correggi wrap e ricalcola la giornata</button>
         <p class="field-note">Per correggere una giornata appena chiusa, inserisci il wrap corretto nel campo manuale e premi “Correggi wrap”. Puoi farlo prima di avviare il giorno successivo.</p>
+        <button type="button" class="secondary reopen-day" id="reopenDay" hidden>Riapri giornata e torna al live time</button>
+        <p class="field-note">La riapertura annulla il risultato della giornata corrente e ripristina l’orologio live. Bet, corone, punteggi impostati e bonus/malus manuali restano disponibili; potrai chiudere di nuovo con il wrap corretto. Puoi riaprire soltanto prima di avviare il giorno successivo.</p>
         <button type="button" class="advance-day" id="advanceDay">Avvia il giorno successivo</button>
         <button type="button" class="reset-all" id="resetDemo">Azzera completamente TotoWrap</button>
       </section>
@@ -194,10 +198,38 @@
         <h3>Registro bonus e malus</h3>
         <div id="pointAdjustmentsLog"></div>
       </section>
+      <section class="admin-page" data-admin-page="push">
+        <form id="pushConfigForm">
+          <h3>Notifiche automatiche</h3>
+          <p class="field-note">Dopo aver installato il servizio Firebase incluso nel pacchetto, incolla la chiave pubblica Web Push e attiva le notifiche. Non inserire chiavi private o password.</p>
+          <label class="push-check"><input id="pushEnabledInput" type="checkbox"> Abilita notifiche per tutti</label>
+          <label>Chiave pubblica VAPID<input id="vapidKeyInput" type="text" autocomplete="off" spellcheck="false" maxlength="87" placeholder="Firebase → Impostazioni progetto → Cloud Messaging → Web Push"></label>
+          <button type="submit" class="primary save-page" id="savePushConfig">Salva configurazione notifiche</button>
+        </form>
+        <button type="button" class="secondary" id="testPush">Invia una notifica di prova a questo dispositivo</button>
+        <p id="pushConfigStatus" class="field-note" aria-live="polite">Servizio da configurare.</p>
+        <p class="field-note">Eventi: chiusura bet, nuova giornata, eliminazioni e wrap. Ogni dispositivo può scegliere quali ricevere. Le eliminazioni rispettano la corona; chiudendo la giornata vengono annullate quelle ancora programmate. Le notifiche possono arrivare con ritardo in base alla rete e al telefono.</p>
+      </section>
       <p class="helper">Ogni modifica viene salvata nel database condiviso e appare in tempo reale su tutti i dispositivi.</p>
     </div>
   </dialog>
 
+  <dialog id="notificationsDialog">
+    <div class="dialog-card">
+      <div class="dialog-head"><h2>Notifications</h2><button type="button" class="icon-btn" id="closeNotifications" aria-label="Close">×</button></div>
+      <p id="pushInstallHint" class="field-note" hidden>On iPhone: Share → Add to Home Screen → Open as Web App. Open TotoWrap from its Home Screen icon, then return here.</p>
+      <p id="pushStatus" class="field-note" aria-live="polite">Checking notification service…</p>
+      <div class="push-options">
+        <label class="push-check"><input type="checkbox" data-push-type="closing" checked> Betting closes</label>
+        <label class="push-check"><input type="checkbox" data-push-type="day" checked> New day</label>
+        <label class="push-check"><input type="checkbox" data-push-type="elimination" checked> Player eliminations</label>
+        <label class="push-check"><input type="checkbox" data-push-type="wrap" checked> Wrap and winners</label>
+      </div>
+      <button type="button" class="primary save-page" id="enablePush" disabled>Enable notifications</button>
+      <button type="button" class="primary save-page" id="savePushPreferences" hidden>Save preferences</button>
+      <button type="button" class="secondary" id="disablePush" hidden>Disable notifications on this device</button>
+    </div>
+  </dialog>
   <dialog id="loginDialog" lang="it">
     <form class="dialog-card" id="loginForm">
       <div class="dialog-head">
@@ -216,6 +248,6 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261008-crown-1" onerror="window.totowrapLoadFailed()"></script>
+  <script type="module" src="app.js?v=20261014-reopen-1" onerror="window.totowrapLoadFailed()"></script>
 </body>
 </html>

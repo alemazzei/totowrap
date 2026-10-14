@@ -167,3 +167,13 @@ body{background:radial-gradient(circle at 90% -10%,rgba(85,168,255,.17),transpar
 .crown-option input {width:20px;height:20px;flex:0 0 20px;accent-color:var(--blue);}
 .crown {white-space:nowrap;}
 .current-winner-names small {font-size:.5em;white-space:nowrap;}
+
+.push-options {display:grid;gap:12px;margin:20px 0;}
+.push-check {display:flex!important;flex-direction:row!important;align-items:center;gap:12px;padding:10px 0;}
+.push-check input {width:20px!important;height:20px;flex:0 0 20px;accent-color:var(--blue);}
+#openNotifications {margin-left:auto;flex-shrink:0;}
+#openNotifications.notifications-on {background:var(--panel2);}
+#notificationsDialog .dialog-card {width:min(460px,100%);}
+@media(max-width:520px){.topbar{gap:8px}#openNotifications{font-size:1rem;padding:8px}#openAdmin{margin-left:0}}
+
+.reopen-day{width:100%;margin-top:12px;padding:14px;border:1px solid var(--blue);border-radius:12px;color:var(--blue);font-weight:800;cursor:pointer;}
