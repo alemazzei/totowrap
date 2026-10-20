@@ -49,21 +49,25 @@ const esc = s => String(s).replace(/[&<>\"']/g, m => ({"&":"&amp;","<":"&lt;",">
 const initials = n => n.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase();
 const DAY_SEC=86400;
 const toSec = t => { if(!t)return null; const [h=0,m=0,s=0]=t.split(":").map(Number); return h*3600+m*60+s; };
-const clock = seconds => {const value=((Math.round(seconds)%DAY_SEC)+DAY_SEC)%DAY_SEC,h=Math.floor(value/3600),m=Math.floor(value%3600/60),s=value%60;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}${s?`:${String(s).padStart(2,"0")}`:""}`};
+const clock = (seconds,showSeconds=false) => {const value=((Math.round(seconds)%DAY_SEC)+DAY_SEC)%DAY_SEC,h=Math.floor(value/3600),m=Math.floor(value%3600/60),s=value%60;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}${s||showSeconds?`:${String(s).padStart(2,"0")}`:""}`};
 const diff = t => { const a=toSec(t),b=toSec(state.wrapTime); if(a===null||b===null)return null;const raw=Math.abs(a-b);return Math.round(Math.min(raw,DAY_SEC-raw)/6)/10; };
 const chronologicalPlayers = players => [...players].sort((a,b)=>(toSec(a[3])??Infinity)-(toSec(b[3])??Infinity)||a[0].localeCompare(b[0],"en"));
 function bettingBands(players=state.players){
-  const unique=[...new Set(players.map(p=>p[3]).filter(Boolean))].sort((a,b)=>toSec(a)-toSec(b));
-  const bands=new Map();
-  if(!unique.length)return bands;
-  if(unique.length===1){const c=toSec(unique[0]);bands.set(unique[0],{lower:c-1800,upper:c+1800,center:c});return bands}
+  // Seconds distinguish predictions, while the winning bands belong to minutes.
+  const times=[...new Set(players.map(p=>p[3]).filter(Boolean))];
+  const unique=[...new Set(times.map(t=>t.slice(0,5)))].sort((a,b)=>toSec(a)-toSec(b));
+  const minuteBands=new Map();
+  if(!unique.length)return minuteBands;
+  if(unique.length===1){const c=toSec(unique[0]);const band={lower:c-1800,upper:c+1800,center:c};return new Map(times.map(t=>[t,band]))}
   let largestGap=-1,start=0;
   unique.forEach((time,i)=>{const current=toSec(time),next=toSec(unique[(i+1)%unique.length])+(i===unique.length-1?DAY_SEC:0),gap=next-current;if(gap>largestGap){largestGap=gap;start=(i+1)%unique.length}});
   const ordered=[...unique.slice(start),...unique.slice(0,start)];
   const centers=ordered.map((time,i)=>{let value=toSec(time);if(i&&value<=toSec(ordered[0]))value+=DAY_SEC;return value});
   const boundaries=[];
   for(let i=0;i<centers.length-1;i++){const lowerBet=centers[i],higherBet=centers[i+1],midpoint=Math.floor((lowerBet+higherBet)/2);boundaries.push(Math.min(higherBet-1,Math.max(lowerBet+59,midpoint)))}
-  ordered.forEach((time,i)=>bands.set(time,{lower:i===0?centers[i]-1800:boundaries[i-1]+1,upper:i===ordered.length-1?centers[i]+1800:boundaries[i],center:centers[i]}));
+  ordered.forEach((time,i)=>minuteBands.set(time,{lower:i===0?centers[i]-1800:boundaries[i-1]+1,upper:i===ordered.length-1?centers[i]+1800:boundaries[i],center:centers[i]}));
+  const bands=new Map();
+  for(const [minute,band] of minuteBands)times.filter(t=>t.slice(0,5)===minute).forEach(t=>bands.set(t,band));
   return bands;
 }
 const bandFor = t => bettingBands().get(t);
@@ -76,7 +80,7 @@ function scoringRules(value=state.scoringRules){
 // Adjacent means the previous/next distinct bet, including across midnight.
 function coveredBets(t,name,players=state.players,crowns=state.crownPlayers){
   if(!t)return [];
-  const ordered=[...bettingBands(players).keys()],i=ordered.indexOf(t);
+  const ordered=[...new Map([...bettingBands(players).keys()].map(bet=>[bet.slice(0,5),bet])).values()],i=ordered.findIndex(bet=>bet.slice(0,5)===t.slice(0,5));
   if(i<0)return [];
   return Array.isArray(crowns)&&crowns.includes(name)?ordered.slice(Math.max(0,i-1),i+2):[t];
 }
@@ -105,7 +109,7 @@ function historicalWinKind(item,day){
 }
 const scoringLabel=rules=>`${rules.exact} pt for the exact minute · ${rules.band} pt for the time band`;
 
-const bandLabel = (t,name) => {const band=playerBand(t,name);return band?`${clock(band.lower)}–${clock(band.upper)}`:"—"};
+const bandLabel = (t,name) => {const band=playerBand(t,name),secondsMode=state.players.some(p=>p[3]&&toSec(p[3])%60!==0);return band?`${clock(band.lower,secondsMode)}–${clock(band.upper,secondsMode)}`:"—"};
 const award = points => points===3?'<span class="award" role="img" aria-label="Exact-minute win">🏆</span>':points===1?'<span class="award" role="img" aria-label="Time-band win">🥇</span>':"";
 function expiredBet(t,now=new Date(),name){
   const band=playerBand(t,name);if(!band)return false;
@@ -555,7 +559,8 @@ function correctClosedWrap(wrap,newRules){
     const rules=scoringRules(newRules||previous[8]||defaultScoringRules),points=winKind===3?rules.exact:winKind===1?rules.band:0;
     const distance=Math.abs(betOffsetSeconds(item.bet,wrap))/60;
     const errorMin=Math.round(distance*10)/10;
-    return {...item,points,errorMin,winKind};
+    const bandBounds=playerBand(item.bet,item.name,dayPlayers,crowns),secondsMode=dayPlayers.some(p=>p[3]&&toSec(p[3])%60!==0);
+    return {...item,points,errorMin,winKind,bandBounds,band:bandBounds?`${clock(bandBounds.lower,secondsMode)}–${clock(bandBounds.upper,secondsMode)}`:"—"};
   });
   state.players.forEach(player=>{
     const old=oldDetails.find(item=>item.name===player[0]),updated=newDetails.find(item=>item.name===player[0]);
