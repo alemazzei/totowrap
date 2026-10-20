@@ -177,3 +177,62 @@ body{background:radial-gradient(circle at 90% -10%,rgba(85,168,255,.17),transpar
 @media(max-width:520px){.topbar{gap:8px}#openNotifications{font-size:1rem;padding:8px}#openAdmin{margin-left:0}}
 
 .reopen-day{width:100%;margin-top:12px;padding:14px;border:1px solid var(--blue);border-radius:12px;color:var(--blue);font-weight:800;cursor:pointer;}
+
+/* The Final Wrap: stories in TotoWrap's own blue/red palette. */
+body.recap-open{overflow:hidden}
+#recapDialog{--recap-blue:#193eb9;--recap-red:#d64557;position:fixed;inset:0;margin:0;width:100vw;max-width:none;height:100vh;height:100dvh;max-height:none;padding:0;border:0;border-radius:0;color:var(--ink);background:radial-gradient(ellipse at 10% 12%,rgba(25,62,185,.1),transparent 47%),radial-gradient(ellipse at 90% 88%,rgba(214,69,87,.11),transparent 45%),var(--bg);overflow:hidden}
+#recapDialog::backdrop{background:rgba(15,28,60,.8)}
+#recapDialog [hidden]{display:none!important}
+.recap-shell{position:relative;width:min(1050px,100%);height:100%;margin:auto;display:flex;flex-direction:column;padding:calc(20px + env(safe-area-inset-top)) 28px calc(14px + env(safe-area-inset-bottom));isolation:isolate}
+.recap-shell::before{content:"";position:absolute;inset:22% 15%;z-index:-1;background:url('gu3-logo.png') center/contain no-repeat;opacity:.025;pointer-events:none}
+.recap-header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;flex:0 0 auto}
+.recap-header-label{font-size:.65rem;letter-spacing:.17em;color:var(--muted);font-weight:800}
+.recap-logo{width:clamp(130px,24vw,210px);height:64px;object-fit:contain}
+#recapClose{justify-self:end;width:42px;height:42px;border:1px solid var(--line);border-radius:50%;background:var(--panel);color:var(--ink);font-size:1.8rem;cursor:pointer;line-height:1}
+.recap-viewport{position:relative;flex:1;min-height:0;display:flex;touch-action:pan-y}
+.recap-slide{width:100%;max-width:760px;min-height:0;max-height:100%;margin:auto;overflow-y:auto;overscroll-behavior:contain;padding:28px 8px;text-align:center;scrollbar-width:thin;scrollbar-color:#b9c7eb transparent}
+.recap-slide.recap-active{animation:recap-enter .32s ease-out both}
+.recap-slide h2{margin:0 0 22px;color:var(--recap-blue);font-size:clamp(2rem,5.2vw,3.7rem);font-weight:900;line-height:1;letter-spacing:-.04em;text-transform:uppercase;text-wrap:balance}
+.recap-kicker{display:block;margin:0 0 18px;color:var(--recap-red);font-size:.72rem;font-weight:800;letter-spacing:.19em}
+.recap-subtitle{color:var(--muted);font-size:.88rem;line-height:1.5;margin:-6px 0 28px}
+.recap-intro{max-width:640px;margin:auto;text-align:left;font-size:clamp(.95rem,2.2vw,1.08rem);line-height:1.75;color:var(--ink)}
+.recap-intro p{margin:0 0 16px}.recap-intro p:last-child{margin-bottom:0}
+.recap-stack{display:grid;gap:14px;max-width:620px;margin:auto}
+.recap-metric{padding:22px 18px;border:1px solid var(--line);border-radius:19px;background:rgba(255,255,255,.8);box-shadow:0 8px 32px rgba(36,56,100,.035);min-width:0}
+.recap-metric>span{display:block;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;font-size:.64rem;line-height:1.5;font-weight:800}
+.recap-metric>strong{display:block;margin-top:8px;font-size:clamp(1.4rem,3.8vw,2.15rem);line-height:1.15;color:var(--recap-blue);font-weight:900}
+.recap-metric>p{margin:10px 0 0;font-size:.83rem;line-height:1.65;font-weight:650;color:var(--ink);text-wrap:balance}
+.recap-stack>.recap-metric:nth-child(2)>strong{color:var(--recap-red)}
+.recap-metrics-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.recap-large-number{display:block;margin-bottom:6px;font-size:clamp(4.5rem,15vw,8rem);color:var(--recap-red);letter-spacing:-.07em}
+.recap-season{margin:34px auto 0;max-width:650px}.recap-season .recap-metric{display:flex;flex-direction:column-reverse;gap:10px;padding:26px 14px}.recap-season .recap-metric strong{margin:0;font-size:clamp(2rem,5.3vw,3.2rem)}
+.recap-podium{height:320px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:end;margin:45px auto 0;max-width:660px}
+.recap-podium-place{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-width:0;padding:22px 10px;border:1px solid #c5d3f3;border-radius:22px 22px 10px 10px;background:linear-gradient(160deg,rgba(255,255,255,.95),rgba(219,229,255,.75))}
+.recap-podium-first{height:100%;border-color:var(--recap-blue);background:linear-gradient(165deg,#193eb9,#345dd0);color:#fff;box-shadow:0 20px 45px rgba(25,62,185,.18)}
+.recap-podium-second{height:82%}.recap-podium-third{height:72%;border-color:#edbbc3;background:linear-gradient(160deg,#fff,#fce8eb)}
+.recap-place-number{font-size:3.4rem;font-weight:900;line-height:1;letter-spacing:-.06em;color:var(--recap-blue)}.recap-place-number>span{font-size:.9rem;letter-spacing:0;margin-left:4px}
+.recap-podium-first .recap-place-number{color:white}.recap-podium-third .recap-place-number{color:var(--recap-red)}
+.recap-podium-place>strong{margin-top:25px;font-size:clamp(.9rem,2.8vw,1.4rem);line-height:1.35;overflow-wrap:anywhere}.recap-podium-place>strong>span{font-size:.65em;opacity:.6}
+.recap-podium-place p{font-size:.75rem;line-height:1.5;margin:12px 0 0;color:var(--muted)}.recap-podium-first p{color:#e2e9ff}
+.recap-cup{position:absolute;top:-36px;font-size:3.2rem;filter:drop-shadow(0 5px 8px rgba(25,62,185,.18))}
+.recap-exact-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;max-width:640px;margin:auto}
+.recap-exact-person{border:1px solid var(--line);background:rgba(255,255,255,.8);border-radius:16px;padding:16px 8px;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0}
+.recap-exact-person>span{font-size:1.3rem}.recap-exact-person>strong{color:var(--recap-blue);font-size:.94rem;overflow-wrap:anywhere}.recap-exact-person>small{color:var(--muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.06em}
+.recap-player{color:var(--recap-red);font-size:clamp(1.25rem,3vw,1.8rem);font-weight:850;margin:-5px 0 16px}
+.recap-graph-card{padding:8px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.78);margin-bottom:16px}
+.recap-chart{display:block;width:100%;height:auto;max-height:300px;overflow:visible}.recap-plot-grid line{stroke:#e0e6f2;stroke-width:1}.recap-plot-grid text{fill:var(--muted);font-size:12px}.recap-plot-line{fill:none;stroke:var(--recap-blue);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.recap-plot-point{fill:white;stroke:var(--recap-blue);stroke-width:2}.recap-plot-point:focus,.recap-plot-point:hover{fill:var(--recap-red);stroke:var(--recap-red);outline:none}.recap-axis-title{fill:var(--muted);font-weight:800;letter-spacing:1px;font-size:10px}
+.recap-chart-note{font-size:.67rem;color:var(--muted);margin:2px 0 8px;line-height:1.5}.recap-graph-card+.recap-metrics-three .recap-metric{padding:15px 8px}.recap-graph-card+.recap-metrics-three .recap-metric strong{font-size:clamp(1.1rem,3vw,1.7rem)}
+.recap-wrap-comparison{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;padding:26px 16px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.85)}
+.recap-wrap-comparison>div>span{display:block;text-transform:uppercase;font-size:.65rem;letter-spacing:.08em;color:var(--muted);font-weight:800}.recap-wrap-comparison strong{display:block;margin-top:12px;font-size:clamp(1.45rem,4vw,2.2rem);color:var(--recap-blue)}.recap-wrap-comparison>div:last-child strong{color:var(--recap-red)}.recap-comparison-arrow{font-size:1.4rem;color:var(--muted)}
+.recap-records .recap-metric{padding:32px 16px}.recap-records .recap-metric strong{font-size:clamp(2.6rem,8vw,4.4rem)}
+.recap-sticker{display:block;width:min(340px,80%);height:auto;aspect-ratio:386/406;object-fit:contain;border-radius:20px;margin:30px auto 0;background:#e8ecf4}.recap-play{display:block;margin:14px auto 0;border:0;border-radius:24px;padding:12px 20px;background:var(--recap-blue);color:white;font-weight:800;cursor:pointer}
+.recap-footer{flex:0 0 auto;padding-top:16px}.recap-dots{display:flex;align-items:center;justify-content:center;gap:1px}.recap-dots button{position:relative;width:24px;height:28px;flex:0 0 24px;border:0;padding:0;background:transparent;cursor:pointer}.recap-dots button::before{content:"";display:block;margin:auto;width:5px;height:5px;border-radius:99px;background:#c4cde2;transition:background .2s,width .2s}.recap-dots button.active::before{background:var(--recap-red);width:16px}.recap-dots button:focus-visible{outline:2px solid var(--recap-blue);outline-offset:0;border-radius:5px}
+.recap-controls{display:flex;align-items:center;justify-content:space-between;gap:20px;max-width:600px;margin:8px auto 0}.recap-controls button{border:1px solid var(--line);border-radius:24px;background:white;color:var(--recap-blue);padding:10px 18px;font-weight:750;cursor:pointer;min-width:90px}.recap-controls button:disabled{opacity:.35;cursor:default}.recap-controls button:last-child{background:var(--recap-blue);border-color:var(--recap-blue);color:white}.recap-controls>span{font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums}.recap-gesture-hint{font-size:.61rem;text-align:center;color:var(--muted);margin:10px 0 0}
+.recap-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@keyframes recap-enter{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:translateX(0)}}
+@media(max-width:600px){.recap-shell{padding:calc(8px + env(safe-area-inset-top)) 16px calc(10px + env(safe-area-inset-bottom))}.recap-header-label{font-size:.5rem;letter-spacing:.08em;max-width:70px;line-height:1.5}.recap-logo{height:52px;width:135px}#recapClose{width:36px;height:36px}.recap-header{gap:8px}.recap-slide{padding:24px 2px}.recap-slide h2{font-size:clamp(1.8rem,8vw,2.8rem);margin-bottom:20px}.recap-kicker{font-size:.61rem;margin-bottom:14px}.recap-intro{font-size:.91rem;line-height:1.65}.recap-intro p{margin-bottom:14px}.recap-stack{gap:10px}.recap-metric{padding:17px 12px}.recap-metric p{font-size:.76rem;line-height:1.6}.recap-metric>span{font-size:.58rem}.recap-podium{gap:7px;height:290px;margin-top:42px}.recap-podium-place{padding:20px 7px}.recap-place-number{font-size:2.8rem}.recap-podium-place>strong{font-size:.88rem;margin-top:22px}.recap-podium-place p{font-size:.64rem}.recap-podium-third strong{margin-top:16px}.recap-podium-third p{margin-top:8px}.recap-exact-grid{gap:8px}.recap-exact-person{padding:12px 4px}.recap-exact-person strong{font-size:.78rem}.recap-exact-person small{font-size:.56rem}.recap-exact-person>span{font-size:1.05rem}.recap-metrics-three{gap:7px}.recap-metrics-three .recap-metric{padding:17px 7px}.recap-metrics-three .recap-metric>span{font-size:.5rem;letter-spacing:.04em}.recap-graph-card{padding:3px;margin-bottom:12px}.recap-player{margin-bottom:14px}.recap-graph-card+.recap-metrics-three .recap-metric{padding:13px 5px}.recap-subtitle{font-size:.78rem;margin-bottom:20px}.recap-graph-card+.recap-metrics-three .recap-metric strong{font-size:1.13rem}.recap-footer{padding-top:5px}.recap-controls{margin-top:4px}.recap-controls button{padding:9px 15px}.recap-sticker{max-width:290px}.recap-records .recap-metric{padding:27px 14px}}
+@media(max-height:650px){.recap-shell{padding-top:6px;padding-bottom:6px}.recap-header .recap-logo{height:40px}.recap-slide{padding-top:12px;padding-bottom:12px}.recap-slide h2{font-size:1.8rem;margin-bottom:14px}.recap-footer{padding-top:0}.recap-gesture-hint{display:none}.recap-kicker{margin-bottom:10px}.recap-podium{height:230px}.recap-podium-place>strong{margin-top:15px}.recap-chart{max-height:205px}.recap-subtitle{margin-bottom:10px}.recap-sticker{max-height:270px;width:auto;max-width:80%}}
+@media(prefers-reduced-motion:reduce){.recap-slide.recap-active{animation:none}.recap-dots button::before{transition:none}}
+
+svg.recap-cup{width:54px;height:54px;top:-34px}.recap-chart-note{white-space:normal!important;overflow-wrap:anywhere;padding:0 4px}
+@media(max-width:600px){.recap-podium-second>strong{font-size:.79rem}}

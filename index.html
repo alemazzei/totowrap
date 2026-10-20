@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=21">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="TotoWrap">
-  <link rel="stylesheet" href="style.css?v=20261020-minute-bands-2">
+  <link rel="stylesheet" href="style.css?v=20261014-reopen-1">
   <style>
     #loadingScreen{position:fixed;inset:0;z-index:100;background:#f4f7fd;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:30px;overflow-y:auto;font-family:system-ui,sans-serif;perspective:900px}
     #loadingScreen[hidden]{display:none!important}
@@ -84,7 +84,7 @@
   </script>
   <div class="shell">
     <header class="topbar">
-      <button class="brand" data-route="today" aria-label="Go to Today">
+      <button class="brand" data-open-recap aria-label="Open The Final Wrap recap" title="The Final Wrap · tap for the recap">
         <span class="logo-flip header-logo" role="img" aria-label="TotoWrap and GU3"><span class="logo-rotor" aria-hidden="true"><span class="logo-face logo-front"><img src="totowrap-logo.png" alt=""></span><span class="logo-face logo-back"><img src="gu3-logo.png" alt=""></span></span></span>
       </button>
       <div class="day-chip"><span>Day</span><strong id="dayNumber">1</strong></div>
@@ -104,6 +104,14 @@
     <main id="app" tabindex="-1"></main>
   </div>
 
+  <dialog id="recapDialog" aria-label="The Final Wrap season recap">
+    <div class="recap-shell">
+      <header class="recap-header"><span class="recap-header-label">THE FINAL WRAP</span><img src="totowrap-logo.png" alt="TotoWrap" class="recap-logo"><button type="button" id="recapClose" aria-label="Close recap">×</button></header>
+      <div id="recapViewport" class="recap-viewport"></div>
+      <footer class="recap-footer"><div class="recap-dots" id="recapDots" aria-label="Choose a recap slide"></div><div class="recap-controls"><button type="button" id="recapBack">← Back</button><span id="recapCount" aria-hidden="true"></span><button type="button" id="recapNext">Next →</button></div><p class="recap-gesture-hint">Swipe to explore · use ← → on desktop</p></footer>
+      <span class="recap-sr-only" id="recapSlideStatus" aria-live="polite" aria-atomic="true"></span>
+    </div>
+  </dialog>
   <dialog id="adminDialog" lang="it">
     <div class="dialog-card">
       <div class="dialog-head">
@@ -248,6 +256,6 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261020-minute-bands-2" onerror="window.totowrapLoadFailed()"></script>
+  <script type="module" src="app.js?v=20261014-reopen-1" onerror="window.totowrapLoadFailed()"></script>
 </body>
 </html>

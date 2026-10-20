@@ -355,7 +355,90 @@ function render(){
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
+// Final Wrap recap: supplied final results and the public final-day accuracy series.
+const FINAL_RECAP_CHARTS = {"Alessandra P": [{"day": 3, "bet": "16:09", "wrap": "17:29:04"}, {"day": 4, "bet": "16:21", "wrap": "15:51:25"}, {"day": 5, "bet": "16:03", "wrap": "16:24:57"}, {"day": 6, "bet": "15:40", "wrap": "15:25:43"}, {"day": 7, "bet": "15:09", "wrap": "15:00"}, {"day": 8, "bet": "16:05", "wrap": "15:07:31"}, {"day": 9, "bet": "15:25", "wrap": "16:19:22"}, {"day": 10, "bet": "15:40", "wrap": "17:11:16"}, {"day": 11, "bet": "16:20", "wrap": "16:22:48"}, {"day": 12, "bet": "17:11", "wrap": "17:16:22"}, {"day": 13, "bet": "17:01", "wrap": "17:17:40"}, {"day": 15, "bet": "16:52", "wrap": "16:53:20"}, {"day": 16, "bet": "16:33", "wrap": "16:44:43"}, {"day": 17, "bet": "17:03", "wrap": "16:32:48"}, {"day": 18, "bet": "17:17:17", "wrap": "16:46"}], "Domiziano": [{"day": 1, "bet": "17:06", "wrap": "16:23"}, {"day": 2, "bet": "16:37", "wrap": "15:33:39"}, {"day": 3, "bet": "15:14", "wrap": "17:29:04"}, {"day": 5, "bet": "16:02", "wrap": "16:24:57"}, {"day": 6, "bet": "16:20", "wrap": "15:25:43"}, {"day": 7, "bet": "14:46", "wrap": "15:00"}, {"day": 8, "bet": "23:34", "wrap": "15:07:31"}, {"day": 9, "bet": "15:19", "wrap": "16:19:22"}, {"day": 10, "bet": "16:05", "wrap": "17:11:16"}, {"day": 11, "bet": "17:00", "wrap": "16:22:48"}, {"day": 12, "bet": "15:20", "wrap": "17:16:22"}, {"day": 13, "bet": "16:50", "wrap": "17:17:40"}, {"day": 14, "bet": "17:53", "wrap": "18:00"}, {"day": 15, "bet": "17:37", "wrap": "16:53:20"}, {"day": 16, "bet": "17:20", "wrap": "16:44:43"}, {"day": 17, "bet": "16:50", "wrap": "16:32:48"}, {"day": 18, "bet": "18:03:48", "wrap": "16:46"}]};
+let recapIndex=0;
+let recapReturnFocus=null;
+function recapDuration(seconds){
+  const n=Math.max(0,Math.round(seconds)),h=Math.floor(n/3600),m=Math.floor(n%3600/60),s=n%60;
+  return h?`${h}h ${m}m${s?` ${s}s`:''}`:`${m?`${m}m `:''}${s}s`;
+}
+function recapSeries(name){
+  return (FINAL_RECAP_CHARTS[name]||[]).map(p=>({day:p.day,seconds:Math.abs(betOffsetSeconds(p.bet,p.wrap))}));
+}
+function recapChart(name){
+  const points=recapSeries(name);if(!points.length)return '<p class="recap-note">No recorded bets.</p>';
+  const W=600,H=300,L=64,R=24,T=24,B=56,plotW=W-L-R,plotH=H-T-B;
+  const maxSeconds=Math.max(600,Math.ceil(Math.max(...points.map(p=>p.seconds))/600)*600);
+  const x=day=>L+(day-1)/17*plotW,y=seconds=>H-B-seconds/maxSeconds*plotH;
+  const grid=[0,.25,.5,.75,1].map(r=>`<g><line x1="${L}" y1="${y(maxSeconds*r)}" x2="${W-R}" y2="${y(maxSeconds*r)}"/><text x="${L-10}" y="${y(maxSeconds*r)+4}" text-anchor="end">${Math.round(maxSeconds*r/60)}m</text></g>`).join('');
+  const labels=[1,3,6,9,12,15,18].map(day=>`<text x="${x(day)}" y="${H-B+23}" text-anchor="middle">${day}</text>`).join('');
+  const path=points.map((p,i)=>`${i&&p.day===points[i-1].day+1?'L':'M'}${x(p.day).toFixed(2)} ${y(p.seconds).toFixed(2)}`).join(' ');
+  const markers=points.map(p=>`<circle class="recap-plot-point" cx="${x(p.day)}" cy="${y(p.seconds)}" r="4.5" tabindex="0" role="img" aria-label="Day ${p.day}: ${recapDuration(p.seconds)} from wrap"><title>Day ${p.day} · ${recapDuration(p.seconds)}</title></circle>`).join('');
+  return `<svg class="recap-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(name)}: distance from wrap over 18 shooting days"><g class="recap-plot-grid">${grid}${labels}</g><path class="recap-plot-line" d="${path}"/>${markers}<text class="recap-axis-title" x="${L+plotW/2}" y="${H-8}" text-anchor="middle">SHOOTING DAYS</text><text class="recap-axis-title" x="15" y="${T+plotH/2}" text-anchor="middle" transform="rotate(-90 15 ${T+plotH/2})">DISTANCE FROM WRAP</text></svg><p class="recap-chart-note">Closer to zero = more accurate. Days without a bet are left blank.</p>`;
+}
+const recapMetric=(label,value,detail='')=>`<div class="recap-metric"><span>${esc(label)}</span><strong>${esc(value)}</strong>${detail?`<p>${esc(detail)}</p>`:''}</div>`;
+function recapAccuracy(title,name,average,bets,wins){
+ return `<h2>${title}</h2><p class="recap-player">${esc(name)}</p><p class="recap-subtitle">Average distance from the official wrap.</p><div class="recap-graph-card">${recapChart(name)}</div><div class="recap-metrics recap-metrics-three">${recapMetric('Average distance',average)}${recapMetric('Bets measured',bets)}${recapMetric('Wins',wins)}</div>`;
+}
+function recapSlides(){
+ const exact=['Stephen','Valentina','Alessandro S','Mitch','Sofia','Yuri','Dani','Caterina','Leonardo G'];
+ return [
+  {title:'The final wrap',html:`<span class="recap-kicker">18 DAYS. ONE FINAL WRAP.</span><h2>The final wrap</h2><div class="recap-intro"><p>On day one, everyone would have sold their mother to win just one day of this amazing game. On this very last day, everyone is missing their mom and we have only one winner.</p><p>It was an incredible journey full of turns, plot twists and revelations. The people who seemed bad actually were bad.</p><p>Only the greatest made it to the top and only the very best won.</p><p>Before celebrating, I’d like you to take a look at this incredible, amazing, unhealthy, sick hell we created, so we can remember what to do and what not to do on our next adventure!</p></div>`},
+  {title:'The regulars',html:`<h2>The regulars</h2><div class="recap-stack">${recapMetric('Most bets placed','18 bets','Carlotta · Ale M · Sofia · Valentina · Leonardo G · Roberto · Marco T · Daniela · Francesca')}${recapMetric('Most forgotten bets','18 forgotten bets','Francesco T · Guido')}${recapMetric('Longest winning streak','2 consecutive wins','Caterina')}</div>`},
+  {title:'The podium',html:`<h2>The podium</h2><p class="recap-subtitle">The final standings. Every place earned.</p><div class="recap-podium"><div class="recap-podium-place recap-podium-second"><span class="recap-place-number">2<span>nd</span></span><strong>Alessandro S<br><span>&amp;</span> Stephen</strong><p>6 points · 1 win each</p></div><div class="recap-podium-place recap-podium-first"><svg class="recap-cup" viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M14 7h20v12c0 8-4 13-10 13s-10-5-10-13V7Z" fill="#d64557" stroke="white" stroke-width="2"/><path d="M14 11H7v7c0 6 4 9 10 9m17-16h7v7c0 6-4 9-10 9M24 32v9m-8 0h16" stroke="#d64557" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="recap-place-number">1<span>st</span></span><strong>Caterina</strong><p>7 points · 3 wins</p></div><div class="recap-podium-place recap-podium-third"><span class="recap-place-number">3<span>rd</span></span><strong>Sofia<br><span>&amp;</span> Francesca</strong><p>5 points · 2 wins each</p></div></div>`},
+  {title:'Most exact bets',html:`<span class="recap-kicker">RIGHT ON THE MINUTE</span><h2><span class="recap-large-number">9</span> exact bets</h2><div class="recap-exact-grid">${exact.map(name=>`<div class="recap-exact-person"><span aria-hidden="true">🎯</span><strong>${esc(name)}</strong><small>1 exact bet</small></div>`).join('')}</div>`},
+  {title:'18 shooting days',html:`<span class="recap-kicker">THE SEASON IN NUMBERS</span><h2><span class="recap-large-number">18</span> shooting days</h2><div class="recap-metrics recap-metrics-three recap-season">${recapMetric('Bamboccioni played',46)}${recapMetric('Bets placed',553)}${recapMetric('Forgotten bets',275)}</div>`},
+  {title:'Most accurate',html:recapAccuracy('Most accurate','Alessandra P','30m 30s',15,0)},
+  {title:'No-winner days',html:`<h2>No-winner days</h2><p class="recap-subtitle">Estimated wrap vs. what actually happened.</p><div class="recap-stack recap-no-winners"><div class="recap-wrap-comparison"><div><span>Estimated wrap</span><strong>17:00</strong></div><span class="recap-comparison-arrow" aria-hidden="true">→</span><div><span>Official wrap</span><strong>17:29:04</strong></div></div><div class="recap-wrap-comparison"><div><span>Estimated wrap</span><strong>17:30</strong></div><span class="recap-comparison-arrow" aria-hidden="true">→</span><div><span>Official wrap</span><strong>15:33:39</strong></div></div></div>`},
+  {title:'Least accurate',html:recapAccuracy('Least accurate','Domiziano','78m 08s',17,0)},
+  {title:'Every second counted',html:`<h2>Every second counted</h2><div class="recap-stack recap-records">${recapMetric('Closest wrong bet','4s','Leonardo I · Day 5')}${recapMetric('Furthest bet from official wrap','8h 27min','Domiziano')}</div>`},
+  {title:'Most used sticker',html:`<span class="recap-kicker">AT THE END…</span><h2>Most used sticker</h2><video id="recapSticker" class="recap-sticker" src="recap-sticker.mp4?v=20261020" muted loop playsinline preload="none" aria-label="Most used sticker: Non ci credo"></video><button type="button" class="recap-play" id="recapPlay" hidden>Play sticker ▶</button>`}
+ ];
+}
+function showRecapSlide(index){
+ const dialog=qs('#recapDialog'),slides=[...dialog.querySelectorAll('.recap-slide')];
+ recapIndex=Math.max(0,Math.min(slides.length-1,index));
+ slides.forEach((slide,i)=>{slide.hidden=i!==recapIndex;slide.classList.toggle('recap-active',i===recapIndex);if(i===recapIndex)slide.scrollTop=0});
+ dialog.querySelectorAll('[data-recap-index]').forEach((dot,i)=>{dot.classList.toggle('active',i===recapIndex);if(i===recapIndex)dot.setAttribute('aria-current','step');else dot.removeAttribute('aria-current')});
+ qs('#recapCount').textContent=`${recapIndex+1} / ${slides.length}`;
+ qs('#recapBack').disabled=recapIndex===0;
+ qs('#recapNext').textContent=recapIndex===slides.length-1?'Finish':'Next →';
+ qs('#recapSlideStatus').textContent=`Slide ${recapIndex+1} of ${slides.length}: ${slides[recapIndex].dataset.title}`;
+ const video=qs('#recapSticker');
+ if(video){if(recapIndex===slides.length-1){video.muted=true;video.play()?.then(()=>{qs('#recapPlay').hidden=true}).catch(()=>{qs('#recapPlay').hidden=false})}else video.pause()}
+}
+function openFinalRecap(){
+ const dialog=qs('#recapDialog');if(dialog.open)return;
+ recapReturnFocus=document.activeElement;
+ const slides=recapSlides();
+ qs('#recapViewport').innerHTML=slides.map((slide,i)=>`<section class="recap-slide" data-title="${esc(slide.title)}" tabindex="0" aria-label="${esc(slide.title)}"${i?' hidden':''}>${slide.html}</section>`).join('');
+ qs('#recapDots').innerHTML=slides.map((slide,i)=>`<button type="button" data-recap-index="${i}" aria-label="Slide ${i+1}: ${esc(slide.title)}"></button>`).join('');
+ dialog.showModal();document.body.classList.add('recap-open');showRecapSlide(0);
+}
+function closeFinalRecap(){qs('#recapDialog').close()}
+function setupFinalRecap(){
+ const dialog=qs('#recapDialog');
+ qs('#recapClose').addEventListener('click',closeFinalRecap);
+ qs('#recapBack').addEventListener('click',()=>showRecapSlide(recapIndex-1));
+ qs('#recapNext').addEventListener('click',()=>recapIndex===recapSlides().length-1?closeFinalRecap():showRecapSlide(recapIndex+1));
+ qs('#recapDots').addEventListener('click',e=>{const dot=e.target.closest('[data-recap-index]');if(dot)showRecapSlide(Number(dot.dataset.recapIndex))});
+ dialog.addEventListener('click',e=>{if(e.target.closest('#recapPlay'))qs('#recapSticker').play().then(()=>qs('#recapPlay').hidden=true).catch(()=>{})});
+ dialog.addEventListener('keydown',e=>{
+   if(e.key==='ArrowRight'){e.preventDefault();showRecapSlide(recapIndex+1)}
+   if(e.key==='ArrowLeft'){e.preventDefault();showRecapSlide(recapIndex-1)}
+   if(e.key==='Home'){e.preventDefault();showRecapSlide(0)}
+   if(e.key==='End'){e.preventDefault();showRecapSlide(recapSlides().length-1)}
+ });
+ dialog.addEventListener('close',()=>{qs('#recapSticker')?.pause();document.body.classList.remove('recap-open');if(recapReturnFocus?.isConnected)recapReturnFocus.focus()});
+ let touch=null;
+ qs('#recapViewport').addEventListener('touchstart',e=>{if(e.touches.length===1)touch={x:e.touches[0].clientX,y:e.touches[0].clientY};else touch=null},{passive:true});
+ qs('#recapViewport').addEventListener('touchend',e=>{if(!touch||!e.changedTouches.length)return;const dx=e.changedTouches[0].clientX-touch.x,dy=e.changedTouches[0].clientY-touch.y;touch=null;if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.5)showRecapSlide(recapIndex+(dx<0?1:-1))},{passive:true});
+ qs('#recapViewport').addEventListener('touchcancel',()=>{touch=null},{passive:true});
+}
+
 document.addEventListener("click",e=>{
+  const recap=e.target.closest("[data-open-recap]");if(recap){e.preventDefault();openFinalRecap();return}
   const tab=e.target.closest("[data-tables-tab]");if(tab){tablesTab=tab.dataset.tablesTab;route="tables";render()}
   const nav=e.target.closest("[data-route]"); if(nav){route=nav.dataset.route;location.hash=route;render()}
   const person=e.target.closest("[data-accuracy-name]");if(person){accuracyPlayer=person.dataset.accuracyName;render()}
@@ -645,3 +728,5 @@ render();
 
 // Load push separately so deployment/configuration errors cannot block gameplay.
 import('./notifications.js?v=20261013-push-1').then(({setupNotifications})=>setupNotifications({firebaseApp,toast,isAdmin:()=>isAdmin})).catch(error=>console.warn('Notifications module unavailable',error.name));
+
+setupFinalRecap();
